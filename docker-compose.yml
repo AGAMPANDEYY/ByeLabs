@@ -1,0 +1,246 @@
+version: '3.8'
+
+# HiLabs Roster Processing - Local Development Stack
+# All services run locally with no external dependencies
+
+services:
+  # =============================================================================
+  # DATABASE - PostgreSQL 15
+  # =============================================================================
+  db:
+    image: postgres:15-alpine
+    container_name: hilabs-db
+    environment:
+      POSTGRES_DB: hilabs
+      POSTGRES_USER: hilabs
+      POSTGRES_PASSWORD: hilabs
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    ports:
+      - "5432:5432"  # PostgreSQL port
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hilabs -d hilabs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hilabs-network
+
+  # =============================================================================
+  # MESSAGE QUEUE - RabbitMQ with Management UI
+  # =============================================================================
+  mq:
+    image: rabbitmq:3.12-management-alpine
+    container_name: hilabs-mq
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_DEFAULT_VHOST: /
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"   # AMQP port
+      - "15672:15672" # Management UI port
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hilabs-network
+
+  # =============================================================================
+  # OBJECT STORAGE - MinIO (S3 Compatible)
+  # =============================================================================
+  minio:
+    image: minio/minio:latest
+    container_name: hilabs-minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+      MINIO_DEFAULT_BUCKETS: hilabs-artifacts
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000" # S3 API port
+      - "9001:9001" # Console UI port
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - hilabs-network
+
+  # =============================================================================
+  # EMAIL TESTING - Mailpit (SMTP + Web UI)
+  # =============================================================================
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: hilabs-mailpit
+    ports:
+      - "1025:1025" # SMTP port
+      - "8025:8025" # Web UI port
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: "1"
+      MP_SMTP_AUTH_ALLOW_INSECURE: "1"
+    networks:
+      - hilabs-network
+
+  # =============================================================================
+  # LOCAL VLM SERVICE - MiniCPM-V or CPU Fallback
+  # =============================================================================
+  vlm:
+    build:
+      context: ./vlm
+      dockerfile: Dockerfile
+    container_name: hilabs-vlm
+    environment:
+      - VLM_MODEL_NAME=${VLM_MODEL_NAME:-minicpm-v}
+      - VLM_TIMEOUT=${VLM_TIMEOUT:-30}
+      - VLM_MAX_RETRIES=${VLM_MAX_RETRIES:-3}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+    ports:
+      - "8080:8080" # VLM API port
+    volumes:
+      - vlm_models:/app/models
+      - vlm_cache:/app/cache
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - hilabs-network
+    # Resource limits for VLM service
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
+  # =============================================================================
+  # API SERVICE - FastAPI + HTMX UI
+  # =============================================================================
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: hilabs-api
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hilabs:hilabs@db:5432/hilabs
+      - CELERY_BROKER_URL=amqp://guest:guest@mq:5672//
+      - S3_ENDPOINT=http://minio:9000
+      - VLM_URL=http://vlm:8080
+      - ALLOW_EGRESS=${ALLOW_EGRESS:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - APP_ENV=${APP_ENV:-local}
+    ports:
+      - "8000:8000" # FastAPI port
+    volumes:
+      - ./logs:/app/logs
+      - ./samples:/app/samples:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      vlm:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - hilabs-network
+
+  # =============================================================================
+  # CELERY WORKERS - Background Processing
+  # =============================================================================
+  worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: hilabs-worker
+    command: celery -A app.celery_app worker --loglevel=info --concurrency=2
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hilabs:hilabs@db:5432/hilabs
+      - CELERY_BROKER_URL=amqp://guest:guest@mq:5672//
+      - S3_ENDPOINT=http://minio:9000
+      - VLM_URL=http://vlm:8080
+      - ALLOW_EGRESS=${ALLOW_EGRESS:-false}
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - APP_ENV=${APP_ENV:-local}
+    volumes:
+      - ./logs:/app/logs
+      - ./samples:/app/samples:ro
+    depends_on:
+      db:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      vlm:
+        condition: service_healthy
+    networks:
+      - hilabs-network
+    # Scale workers as needed
+    deploy:
+      replicas: 1
+
+  # =============================================================================
+  # CELERY FLOWER - Task Monitoring (Optional)
+  # =============================================================================
+  flower:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    container_name: hilabs-flower
+    command: celery -A app.celery_app flower --port=5555
+    environment:
+      - CELERY_BROKER_URL=amqp://guest:guest@mq:5672//
+      - FLOWER_BASIC_AUTH=admin:admin
+    ports:
+      - "5555:5555" # Flower UI port
+    depends_on:
+      - mq
+    networks:
+      - hilabs-network
+    profiles:
+      - monitoring
+
+# =============================================================================
+# VOLUMES - Persistent Data Storage
+# =============================================================================
+volumes:
+  postgres_data:
+    driver: local
+  rabbitmq_data:
+    driver: local
+  minio_data:
+    driver: local
+  vlm_models:
+    driver: local
+  vlm_cache:
+    driver: local
+
+# =============================================================================
+# NETWORKS - Service Communication
+# =============================================================================
+networks:
+  hilabs-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16
+

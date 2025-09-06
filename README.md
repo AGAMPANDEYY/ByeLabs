@@ -1,10 +1,9 @@
-***
-# HiLabs Roster Email → Excel (Local-Only, Open-Source)
+# HiLabs Roster Email → Excel (Local-Only, Multi-Agent, VLM-Assisted)
 
-## Goal
+## 🎯 Goal
 Convert provider roster emails (**HTML/PDF/Image/XLS/CSV/Inline Text**) into a **clean Excel** matching the required schema—completely end-to-end on your machine, with auditability, version history/rollback, a review UI, and **AI assist (local VLM)** for tough documents.
 
-## Rule Compliance  
+## ✅ Rule Compliance  
 - ✅ **Open source code**  
 - ✅ **Runs fully locally**: Docker Compose brings up DB, object store, queue, VLM, and SMTP test server  
 - ✅ **No uploads** to third-party servers  
@@ -13,32 +12,41 @@ Convert provider roster emails (**HTML/PDF/Image/XLS/CSV/Inline Text**) into a *
 
 ***
 
-## Quick Start (5–10 minutes)
+## 🚀 Quick Start (5–10 minutes)
 
-### Prereqs
-- macOS / Linux / Windows (WSL2)
-- Docker Desktop (Compose v2)
-- ~8–12 GB RAM free for services (CPU-only works; GPU optional)
+### Prerequisites
+- **macOS / Linux / Windows (WSL2)**
+- **Docker Desktop** (Compose v2)
+- **~8–12 GB RAM** free for services (CPU-only works; GPU optional)
 
-### Run it
-```sh
+### One-Command Setup
+```bash
 git clone https://github.com/<you>/hilabs-roster.git
 cd hilabs-roster
-cp .env.example .env   # or use run.sh
 ./run.sh               # brings up full stack locally
 ```
 
+The `run.sh` script will:
+- ✅ Copy `.env.example` → `.env` if missing
+- ✅ Create directory structure
+- ✅ Start all services with Docker Compose
+- ✅ Wait for services to be ready
+- ✅ Display all service URLs
+
 ***
 
-## Open UIs
+## 🌐 Service URLs
 
-- API docs: [http://localhost:8000/docs](http://localhost:8000/docs)
-- Review UI: [http://localhost:8000/ui/jobs](http://localhost:8000/ui/jobs)
-- Mailpit (test inbox): [http://localhost:8025](http://localhost:8025)
-- MinIO (object store): [http://localhost:9001](http://localhost:9001) (`minio` / `minio123`)
-- RabbitMQ console: [http://localhost:15672](http://localhost:15672) (`guest` / `guest`)
-- Metrics (Prometheus): [http://localhost:8000/metrics](http://localhost:8000/metrics)
-- Local VLM service health: [http://localhost:8080/health](http://localhost:8080/health)
+| Service | URL | Credentials |
+|---------|-----|-------------|
+| **API Documentation** | [http://localhost:8000/docs](http://localhost:8000/docs) | - |
+| **Review UI** | [http://localhost:8000/ui/jobs](http://localhost:8000/ui/jobs) | - |
+| **Mailpit (Email Test)** | [http://localhost:8025](http://localhost:8025) | - |
+| **MinIO Console** | [http://localhost:9001](http://localhost:9001) | `minio` / `minio123` |
+| **RabbitMQ Management** | [http://localhost:15672](http://localhost:15672) | `guest` / `guest` |
+| **Metrics (Prometheus)** | [http://localhost:8000/metrics](http://localhost:8000/metrics) | - |
+| **VLM Health Check** | [http://localhost:8080/health](http://localhost:8080/health) | - |
+| **Flower (Task Monitor)** | [http://localhost:5555](http://localhost:5555) | `admin` / `admin` |
 
 ***
 

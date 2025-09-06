@@ -27,7 +27,7 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .net_guard import test_egress_guard, test_local_requests
-from .db import init_database, check_database_connection, get_database_info, get_db
+from .db import init_database, check_database_connection, get_database_info, get_db, get_db_session
 from .llm import get_llm_client
 from .storage import ensure_bucket, storage_client, calculate_checksum, generate_object_key
 from .models import Email, Job, Version, Record, Issue, Export, AuditLog, JobStatus, IssueLevel

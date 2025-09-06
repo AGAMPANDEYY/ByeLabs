@@ -1,0 +1,21 @@
+# Core FastAPI dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+
+# PDF processing
+pdfplumber==0.10.3
+PyPDF2==3.0.1
+
+# Image processing
+pillow==10.1.0
+
+# Data processing
+pandas==2.1.4
+numpy==1.25.2
+
+# HTTP client
+httpx==0.25.2
+
+# Utilities
+python-multipart==0.0.6

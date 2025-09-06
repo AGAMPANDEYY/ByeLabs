@@ -1,0 +1,133 @@
+services:
+  # Database
+  db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: hilabs
+      POSTGRES_USER: hilabs
+      POSTGRES_PASSWORD: hilabs
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hilabs -d hilabs"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Message Queue
+  mq:
+    image: rabbitmq:3-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: guest
+      RABBITMQ_DEFAULT_PASS: guest
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Object Storage
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"    # API port
+      - "9001:9001"    # Console port
+    volumes:
+      - minio_data:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Email Testing
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "8025:8025"    # Web UI
+      - "1025:1025"    # SMTP port
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:8025"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # API Service
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.simple
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hilabs:hilabs@db:5432/hilabs
+      - S3_ENDPOINT=http://minio:9000
+      - S3_ACCESS_KEY=minio
+      - S3_SECRET_KEY=minio123
+      - S3_BUCKET=hilabs-artifacts
+      - CELERY_BROKER_URL=amqp://guest:guest@mq:5672//
+      - VLM_URL=http://vlm:8080
+      - ALLOW_EGRESS=false
+    depends_on:
+      db:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Worker Service
+  worker:
+    build:
+      context: ./api
+      dockerfile: Dockerfile.simple
+    command: celery -A app.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+psycopg2://hilabs:hilabs@db:5432/hilabs
+      - S3_ENDPOINT=http://minio:9000
+      - S3_ACCESS_KEY=minio
+      - S3_SECRET_KEY=minio123
+      - S3_BUCKET=hilabs-artifacts
+      - CELERY_BROKER_URL=amqp://guest:guest@mq:5672//
+      - VLM_URL=http://vlm:8080
+      - ALLOW_EGRESS=false
+    depends_on:
+      db:
+        condition: service_healthy
+      mq:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+
+  # VLM Service
+  vlm:
+    build:
+      context: ./vlm
+      dockerfile: Dockerfile.simple
+    ports:
+      - "8080:8080"
+    environment:
+      - VLM_ENABLED=true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  postgres_data:
+  minio_data:

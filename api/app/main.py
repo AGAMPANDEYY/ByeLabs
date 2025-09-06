@@ -21,7 +21,7 @@ from fastapi import FastAPI, Request, Response, UploadFile, File, HTTPException,
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 import structlog
 from sqlalchemy.orm import Session
 
@@ -67,7 +67,7 @@ REQUEST_DURATION = Histogram(
     ['method', 'endpoint']
 )
 
-ACTIVE_CONNECTIONS = Counter(
+ACTIVE_CONNECTIONS = Gauge(
     'http_active_connections',
     'Number of active HTTP connections'
 )

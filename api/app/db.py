@@ -128,9 +128,10 @@ def check_database_connection() -> bool:
         True if connection is successful, False otherwise
     """
     try:
+        from sqlalchemy import text
         with get_db_session() as session:
             # Simple query to test connection
-            session.execute("SELECT 1")
+            session.execute(text("SELECT 1"))
             return True
     except Exception as e:
         logger.error(f"Database connection check failed: {e}")

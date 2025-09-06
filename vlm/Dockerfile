@@ -1,48 +1,50 @@
-# HiLabs Roster Processing - VLM Service
-# Minimal VLM service for local-only operation
+# Multi-stage build for the local VLM service
+FROM python:3.11-slim as base
 
-FROM python:3.11-slim
+ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV APP_HOME /app
+WORKDIR $APP_HOME
 
-# Set environment variables
-ENV PYTHONUNBUFFERED=1 \
-    PYTHONDONTWRITEBYTECODE=1 \
-    PIP_NO_CACHE_DIR=1
-
-# Install system dependencies
+# Install system dependencies for image processing, PDF handling, and OCR
 RUN apt-get update && apt-get install -y \
-    curl \
+    build-essential \
+    gcc \
+    g++ \
+    poppler-utils \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    libgl1-mesa-glx \
+    libglib2.0-0 \
+    libsm6 \
+    libxext6 \
+    libxrender-dev \
+    libgomp1 \
+    libgcc-s1 \
+    # Clean up
     && rm -rf /var/lib/apt/lists/*
 
-# Create app user
-RUN groupadd -r appuser && useradd -r -g appuser appuser
-
-# Set work directory
-WORKDIR /app
-
-# Copy requirements
-COPY requirements.txt .
-
-# Install Python dependencies
+# Create a virtual environment
+FROM base as builder
+COPY ./requirements.txt .
+RUN python -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+RUN pip install --no-cache-dir --upgrade pip
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY . .
+# Final stage for the VLM application
+FROM base as final
+COPY --from=builder /opt/venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Create necessary directories
-RUN mkdir -p /app/models /app/cache
+COPY . $APP_HOME
 
-# Change ownership
-RUN chown -R appuser:appuser /app
-
-# Switch to non-root user
-USER appuser
-
-# Expose port
+# Expose port for VLM service
 EXPOSE 8080
 
 # Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8080/health || exit 1
 
-# Start command
-CMD ["python", "app.py"]
+# Command to run the VLM application
+CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8080", "--workers", "1"]

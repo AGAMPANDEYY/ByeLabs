@@ -1,16 +1,33 @@
-# HiLabs Roster Processing - VLM Service Dependencies
+# Core FastAPI dependencies
+fastapi==0.116.1
+uvicorn==0.35.0
+pydantic==2.11.7
 
-# Core FastAPI
-fastapi==0.104.1
-uvicorn==0.24.0
-pydantic==2.5.0
+# Image processing and PDF handling
+pillow==10.4.0
+pdfplumber==0.11.0
+pymupdf==1.26.4
 
-# Image processing
-Pillow==10.1.0
+# OCR capabilities
+pytesseract==0.3.13
 
-# PDF processing
-pdfplumber==0.10.3
+# Machine Learning and VLM
+torch==2.3.1
+torchvision==0.18.1
+transformers==4.42.3
+accelerate==0.34.1
+bitsandbytes==0.44.1
+
+# VLM specific models (MiniCPM-V and alternatives)
+# Note: These will be downloaded on first use
+# openmim==0.3.9
+# timm==0.9.16
 
 # Utilities
-python-multipart==0.0.6
-httpx==0.25.2
+numpy==1.26.4
+opencv-python-headless==4.10.0.84
+requests==2.32.5
+structlog==25.4.0
+
+# Optional: For better performance
+# flash-attn==2.5.8  # Uncomment if you have compatible hardware

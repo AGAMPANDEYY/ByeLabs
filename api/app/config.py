@@ -119,6 +119,11 @@ class Settings(BaseSettings):
     )
     cors_credentials: bool = Field(default=True, description="Allow CORS credentials")
     
+    # Local LLM settings
+    local_llm_enabled: bool = Field(default=False, env="LOCAL_LLM_ENABLED", description="Enable local LLM for classification and mapping")
+    local_llm_model: str = Field(default="microsoft/DialoGPT-small", env="LOCAL_LLM_MODEL", description="Hugging Face model name for local LLM")
+    local_llm_max_tokens: int = Field(default=512, env="LOCAL_LLM_MAX_TOKENS", description="Maximum tokens for LLM generation")
+    
     # =============================================================================
     # PROCESSING CONFIGURATION
     # =============================================================================

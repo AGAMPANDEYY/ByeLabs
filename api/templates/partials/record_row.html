@@ -1,0 +1,70 @@
+<tr id="row-{{ row_idx }}" class="hover:bg-gray-50">
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{{ row_idx }}</td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <input type="text" 
+               value="{{ record.get('NPI', '') }}" 
+               class="w-full border-0 bg-transparent focus:ring-2 focus:ring-blue-500"
+               hx-post="/ui/jobs/{{ job.id }}/edit"
+               hx-vals='{"row_idx": {{ row_idx }}, "field": "NPI"}'
+               hx-target="#row-{{ row_idx }}"
+               hx-trigger="blur">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <input type="text" 
+               value="{{ record.get('Provider Name', '') }}" 
+               class="w-full border-0 bg-transparent focus:ring-2 focus:ring-blue-500"
+               hx-post="/ui/jobs/{{ job.id }}/edit"
+               hx-vals='{"row_idx": {{ row_idx }}, "field": "Provider Name"}'
+               hx-target="#row-{{ row_idx }}"
+               hx-trigger="blur">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <input type="text" 
+               value="{{ record.get('Specialty', '') }}" 
+               class="w-full border-0 bg-transparent focus:ring-2 focus:ring-blue-500"
+               hx-post="/ui/jobs/{{ job.id }}/edit"
+               hx-vals='{"row_idx": {{ row_idx }}, "field": "Specialty"}'
+               hx-target="#row-{{ row_idx }}"
+               hx-trigger="blur">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <input type="text" 
+               value="{{ record.get('Phone', '') }}" 
+               class="w-full border-0 bg-transparent focus:ring-2 focus:ring-blue-500"
+               hx-post="/ui/jobs/{{ job.id }}/edit"
+               hx-vals='{"row_idx": {{ row_idx }}, "field": "Phone"}'
+               hx-target="#row-{{ row_idx }}"
+               hx-trigger="blur">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <input type="text" 
+               value="{{ record.get('Email', '') }}" 
+               class="w-full border-0 bg-transparent focus:ring-2 focus:ring-blue-500"
+               hx-post="/ui/jobs/{{ job.id }}/edit"
+               hx-vals='{"row_idx": {{ row_idx }}, "field": "Email"}'
+               hx-target="#row-{{ row_idx }}"
+               hx-trigger="blur">
+    </td>
+    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+        <input type="text" 
+               value="{{ record.get('Effective Date', '') }}" 
+               class="w-full border-0 bg-transparent focus:ring-2 focus:ring-blue-500"
+               hx-post="/ui/jobs/{{ job.id }}/edit"
+               hx-vals='{"row_idx": {{ row_idx }}, "field": "Effective Date"}'
+               hx-target="#row-{{ row_idx }}"
+               hx-trigger="blur">
+    </td>
+</tr>
+
+{% if issues %}
+<!-- Show validation issues for this row -->
+<tr class="bg-red-50">
+    <td colspan="7" class="px-6 py-2">
+        {% for issue in issues %}
+        <div class="text-xs text-red-600 mb-1">
+            <strong>{{ issue.field }}:</strong> {{ issue.message }}
+        </div>
+        {% endfor %}
+    </td>
+</tr>
+{% endif %}

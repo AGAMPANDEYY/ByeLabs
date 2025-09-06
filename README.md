@@ -307,6 +307,39 @@ docker compose up --build
 
 ## Testing & Demo Flow
 
+### How to Run Tests
+
+#### Unit Tests
+```bash
+# Run all unit tests
+python tests/run_tests.py
+
+# Run specific test modules
+python -m unittest tests.test_npi_validation
+python -m unittest tests.test_normalization
+python -m unittest tests.test_duplicate_detection
+python -m unittest tests.test_excel_export
+```
+
+#### Smoke Test (End-to-End)
+```bash
+# Linux/macOS
+./scripts/smoke.sh
+
+# Windows PowerShell
+.\scripts\smoke.ps1
+```
+
+The smoke test will:
+1. Start Docker Compose services (if not running)
+2. Wait for API to be ready
+3. Create a sample EML file (if needed)
+4. Ingest the sample file
+5. Poll job status until completion
+6. Trigger Excel export
+7. Provide download URL
+
+### Manual Demo Flow
 1. Start stack: `./run.sh`
 2. In Mailpit UI, click "Send" (sample attachments also work via /ingest)
 3. Open Inbox UI → select job → click "Process to Excel"

@@ -8,26 +8,18 @@ multi-agent pipeline: Intake → Classifier → Extractor → Normalizer → Val
 import time
 from typing import Dict, Any
 from sqlalchemy.orm import Session
-from prometheus_client import Counter, Histogram
-import structlog
 
 from .celery_app import celery_app
 from .db import get_db_session
 from .models import Job, Version, Record, Issue, Export, JobStatus, IssueLevel
 from .storage import storage_client, calculate_checksum, generate_object_key
 from .orchestrator import run_graph, resume_graph
+from .metrics import track_pipeline_metrics, get_logger
 
-logger = structlog.get_logger(__name__)
-
-# Prometheus metrics
-PIPELINE_RUNS_TOTAL = Counter(
-    "pipeline_runs_total", "Total pipeline runs", ["status"]
-)
-PIPELINE_LATENCY_SECONDS = Histogram(
-    "pipeline_latency_seconds", "Pipeline execution latency"
-)
+logger = get_logger(__name__)
 
 @celery_app.task(bind=True, name="app.pipeline.process_job")
+@track_pipeline_metrics()
 def process_job(self, job_id: int):
     """
     Process a job through the multi-agent pipeline.

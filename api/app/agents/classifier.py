@@ -10,19 +10,13 @@ This agent classifies documents and determines processing strategy:
 import time
 import re
 from typing import Dict, Any, List
-from prometheus_client import Counter, Histogram
-import structlog
 
-logger = structlog.get_logger(__name__)
+from ..metrics import track_agent_metrics, get_logger, track_extract_fallback
+from ..llm import get_llm_client
 
-# Prometheus metrics
-AGENT_RUNS_TOTAL = Counter(
-    "agent_runs_total", "Total agent runs", ["agent"]
-)
-AGENT_LATENCY_SECONDS = Histogram(
-    "agent_latency_seconds", "Agent execution latency", ["agent"]
-)
+logger = get_logger(__name__)
 
+@track_agent_metrics("classifier")
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Classify documents and determine processing strategy.
@@ -33,18 +27,16 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Updated state with classification results
     """
-    start_time = time.time()
-    agent_name = "classifier"
-    
     logger.info("Starting classifier agent", job_id=state.get("job_id"))
     
     try:
-        # Increment run counter
-        AGENT_RUNS_TOTAL.labels(agent=agent_name).inc()
         
         artifacts = state.get("artifacts", {})
         if not artifacts:
             raise ValueError("No artifacts found in state")
+        
+        # Get LLM client for enhanced classification
+        llm_client = get_llm_client()
         
         # Classify each artifact
         classified_artifacts = []
@@ -52,14 +44,14 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
         # Classify email body
         email_body = artifacts.get("email_body", {})
         if email_body:
-            body_classification = _classify_email_body(email_body)
+            body_classification = _classify_email_body(email_body, llm_client)
             if body_classification:
                 classified_artifacts.append(body_classification)
         
         # Classify attachments
         attachments = artifacts.get("attachments", [])
         for attachment in attachments:
-            attachment_classification = _classify_attachment(attachment)
+            attachment_classification = _classify_attachment(attachment, llm_client)
             if attachment_classification:
                 classified_artifacts.append(attachment_classification)
         
@@ -103,13 +95,49 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
         duration = time.time() - start_time
         AGENT_LATENCY_SECONDS.labels(agent=agent_name).observe(duration)
 
-def _classify_email_body(email_body: Dict[str, Any]) -> Dict[str, Any]:
+def _classify_email_body(email_body: Dict[str, Any], llm_client=None) -> Dict[str, Any]:
     """Classify email body content."""
     html_content = email_body.get("html", "")
     text_content = email_body.get("text", "")
     
     # Check for HTML table
     if html_content and "<table" in html_content.lower():
+        # Use LLM for enhanced classification if available
+        if llm_client:
+            try:
+                # Extract table headers for LLM analysis
+                import re
+                table_headers = re.findall(r'<th[^>]*>(.*?)</th>', html_content, re.IGNORECASE | re.DOTALL)
+                table_headers = [re.sub(r'<[^>]+>', '', h).strip() for h in table_headers]
+                
+                # Get LLM classification
+                llm_result = llm_client.classify_document_type(
+                    content=html_content[:1000],  # First 1000 chars
+                    headers=table_headers
+                )
+                
+                # Use LLM result if confidence is high
+                if llm_result.get("confidence", 0) > 0.7:
+                    return {
+                        "type": "email_body",
+                        "document_type": llm_result.get("type", "HTML_TABLE"),
+                        "content": html_content,
+                        "confidence": llm_result.get("confidence", 0.9),
+                        "extraction_method": "rule_based",
+                        "llm_enhanced": True,
+                        "llm_reasoning": llm_result.get("reasoning", ""),
+                        "metadata": {
+                            "has_html": True,
+                            "has_text": bool(text_content),
+                            "table_count": html_content.lower().count("<table"),
+                            "headers_found": table_headers
+                        }
+                    }
+            except Exception as e:
+                logger.warning("LLM classification failed, using fallback", error=str(e))
+                track_extract_fallback("classifier", "llm_classification_failed")
+        
+        # Fallback to rule-based classification
         return {
             "type": "email_body",
             "document_type": "HTML_TABLE",
@@ -160,7 +188,7 @@ def _classify_email_body(email_body: Dict[str, Any]) -> Dict[str, Any]:
         }
     }
 
-def _classify_attachment(attachment: Dict[str, Any]) -> Dict[str, Any]:
+def _classify_attachment(attachment: Dict[str, Any], llm_client=None) -> Dict[str, Any]:
     """Classify an attachment based on filename and content type."""
     filename = attachment.get("filename", "").lower()
     content_type = attachment.get("content_type", "").lower()

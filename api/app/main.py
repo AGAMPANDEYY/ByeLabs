@@ -19,7 +19,8 @@ from typing import Dict, Any, List, Optional
 
 from fastapi import FastAPI, Request, Response, UploadFile, File, HTTPException, Depends, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, HTMLResponse
+from fastapi.templating import Jinja2Templates
 from prometheus_client import Counter, Histogram, generate_latest, CONTENT_TYPE_LATEST
 import structlog
 from sqlalchemy.orm import Session
@@ -27,6 +28,7 @@ from sqlalchemy.orm import Session
 from .config import settings
 from .net_guard import test_egress_guard, test_local_requests
 from .db import init_database, check_database_connection, get_database_info, get_db
+from .llm import get_llm_client
 from .storage import ensure_bucket, storage_client, calculate_checksum, generate_object_key
 from .models import Email, Job, Version, Record, Issue, Export, AuditLog, JobStatus, IssueLevel
 
@@ -140,6 +142,9 @@ app.add_middleware(
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
+
+# Initialize templates
+templates = Jinja2Templates(directory="api/templates")
 
 
 @app.middleware("http")
@@ -259,23 +264,33 @@ async def health_check() -> Dict[str, Any]:
 
 
 @app.get("/health/ready", tags=["Health"])
+@app.get("/healthz/ready", tags=["Health"])  # Kubernetes-style endpoint
 async def readiness_check() -> Dict[str, Any]:
     """
     Readiness check endpoint.
     
     Returns whether the application is ready to serve requests.
+    Kubernetes-compatible endpoint at /healthz/ready.
     """
-    # TODO: Check database connectivity
-    # TODO: Check MinIO connectivity
-    # TODO: Check RabbitMQ connectivity
-    # TODO: Check VLM service connectivity
+    # Check database connectivity
+    db_ready = check_database_connection()
+    
+    # Check storage connectivity
+    storage_ready = True
+    try:
+        storage_client.object_exists("health-check")
+    except Exception:
+        storage_ready = False
+    
+    # Check if all critical services are ready
+    ready = db_ready and storage_ready
     
     return {
-        "status": "ready",
+        "status": "ready" if ready else "not_ready",
         "timestamp": time.time(),
         "checks": {
-            "database": "ready",  # TODO: Implement actual check
-            "storage": "ready",   # TODO: Implement actual check
+            "database": "ready" if db_ready else "not_ready",
+            "storage": "ready" if storage_ready else "not_ready",
             "queue": "ready",     # TODO: Implement actual check
             "vlm": "ready"        # TODO: Implement actual check
         }
@@ -707,6 +722,375 @@ async def get_job_details(
         logger.error("Error getting job details", job_id=job_id, error=str(e))
         raise HTTPException(status_code=500, detail="Internal server error")
 
+
+# ============================================================================
+# UI ROUTES (HTMX)
+# ============================================================================
+
+@app.get("/ui/jobs", response_class=HTMLResponse)
+async def ui_jobs_list():
+    """List all jobs with statuses and action buttons."""
+    try:
+        with get_db_session() as db:
+            jobs = db.query(Job).order_by(Job.created_at.desc()).limit(50).all()
+            
+            jobs_data = []
+            for job in jobs:
+                jobs_data.append({
+                    "id": job.id,
+                    "status": job.status.value,
+                    "created_at": job.created_at.strftime("%Y-%m-%d %H:%M"),
+                    "updated_at": job.updated_at.strftime("%Y-%m-%d %H:%M") if job.updated_at else None,
+                    "current_version_id": job.current_version_id
+                })
+        
+        return templates.TemplateResponse("jobs_list.html", {
+            "request": request,
+            "jobs": jobs_data
+        })
+        
+    except Exception as e:
+        logger.error("Error loading jobs list", error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/ui/jobs/{job_id}", response_class=HTMLResponse)
+async def ui_job_detail(job_id: int):
+    """Job detail page with two-pane layout: artifact preview + editable grid."""
+    try:
+        with get_db_session() as db:
+            # Get job details
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if not job:
+                raise HTTPException(status_code=404, detail="Job not found")
+            
+            # Get current version records
+            records = []
+            if job.current_version_id:
+                records_query = db.query(Record).filter(Record.version_id == job.current_version_id).order_by(Record.row_idx)
+                records = [{"row_idx": r.row_idx, "data": r.payload_json} for r in records_query.all()]
+            
+            # Get validation issues
+            issues = []
+            if job.current_version_id:
+                issues_query = db.query(Issue).filter(Issue.version_id == job.current_version_id)
+                issues = [{"row_idx": i.row_idx, "field": i.field, "level": i.level.value, "message": i.message} for i in issues_query.all()]
+            
+            # Get versions history
+            versions = db.query(Version).filter(Version.job_id == job_id).order_by(Version.created_at.desc()).all()
+            versions_data = [{"id": v.id, "author": v.author, "reason": v.reason, "created_at": v.created_at.strftime("%Y-%m-%d %H:%M")} for v in versions]
+        
+        return templates.TemplateResponse("job_detail.html", {
+            "request": request,
+            "job": {
+                "id": job.id,
+                "status": job.status.value,
+                "created_at": job.created_at.strftime("%Y-%m-%d %H:%M"),
+                "current_version_id": job.current_version_id
+            },
+            "records": records,
+            "issues": issues,
+            "versions": versions_data
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error loading job detail", job_id=job_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/ui/jobs/{job_id}/edit")
+async def ui_edit_record(job_id: int, request: Request):
+    """Handle inline editing with HTMX - creates new version and re-validates."""
+    try:
+        form_data = await request.form()
+        row_idx = int(form_data.get("row_idx"))
+        field = form_data.get("field")
+        new_value = form_data.get("value", "").strip()
+        
+        with get_db_session() as db:
+            # Get current job and version
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if not job or not job.current_version_id:
+                raise HTTPException(status_code=404, detail="Job or version not found")
+            
+            # Get current records
+            records = db.query(Record).filter(Record.version_id == job.current_version_id).order_by(Record.row_idx).all()
+            
+            # Find and update the specific record
+            updated_record = None
+            for record in records:
+                if record.row_idx == row_idx:
+                    # Update the field
+                    record.payload_json[field] = new_value
+                    updated_record = record
+                    break
+            
+            if not updated_record:
+                raise HTTPException(status_code=404, detail="Record not found")
+            
+            # Create new version with updated data
+            new_version = Version(
+                job_id=job_id,
+                parent_version_id=job.current_version_id,
+                author="user",
+                reason=f"Edit {field} in row {row_idx}",
+                created_at=datetime.now(timezone.utc)
+            )
+            db.add(new_version)
+            db.flush()  # Get the new version ID
+            
+            # Copy all records to new version with the update
+            for record in records:
+                new_record = Record(
+                    job_id=job_id,
+                    version_id=new_version.id,
+                    row_idx=record.row_idx,
+                    payload_json=record.payload_json.copy()
+                )
+                db.add(new_record)
+            
+            # Update job current version
+            job.current_version_id = new_version.id
+            job.updated_at = datetime.now(timezone.utc)
+            
+            db.commit()
+            
+            # Re-validate the updated data (simplified)
+            validation_issues = _validate_record_data(updated_record.payload_json, row_idx)
+            
+            # Store validation issues
+            for issue in validation_issues:
+                issue_record = Issue(
+                    version_id=new_version.id,
+                    row_idx=issue["row_idx"],
+                    field=issue["field"],
+                    level=IssueLevel(issue["level"]),
+                    message=issue["message"],
+                    created_at=datetime.now(timezone.utc)
+                )
+                db.add(issue_record)
+            
+            db.commit()
+        
+        # Return updated row HTML for HTMX
+        return templates.TemplateResponse("partials/record_row.html", {
+            "request": request,
+            "record": updated_record.payload_json,
+            "row_idx": row_idx,
+            "issues": validation_issues
+        })
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error editing record", job_id=job_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/jobs/{job_id}/versions")
+async def get_job_versions(job_id: int):
+    """Get all versions for a job."""
+    try:
+        with get_db_session() as db:
+            versions = db.query(Version).filter(Version.job_id == job_id).order_by(Version.created_at.desc()).all()
+            
+            versions_data = []
+            for version in versions:
+                # Get record count for this version
+                record_count = db.query(Record).filter(Record.version_id == version.id).count()
+                issue_count = db.query(Issue).filter(Issue.version_id == version.id).count()
+                
+                versions_data.append({
+                    "id": version.id,
+                    "author": version.author,
+                    "reason": version.reason,
+                    "created_at": version.created_at.isoformat(),
+                    "record_count": record_count,
+                    "issue_count": issue_count,
+                    "parent_version_id": version.parent_version_id
+                })
+        
+        return {"versions": versions_data}
+        
+    except Exception as e:
+        logger.error("Error getting job versions", job_id=job_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/jobs/{job_id}/versions/{version_id}/rollback")
+async def rollback_to_version(job_id: int, version_id: int):
+    """Rollback job to a specific version."""
+    try:
+        with get_db_session() as db:
+            # Verify job and version exist
+            job = db.query(Job).filter(Job.id == job_id).first()
+            version = db.query(Version).filter(Version.id == version_id, Version.job_id == job_id).first()
+            
+            if not job or not version:
+                raise HTTPException(status_code=404, detail="Job or version not found")
+            
+            # Update job current version
+            job.current_version_id = version_id
+            job.updated_at = datetime.now(timezone.utc)
+            
+            # Create audit log
+            audit_log = AuditLog(
+                job_id=job_id,
+                actor="user",
+                action="rollback",
+                before_json={"current_version_id": job.current_version_id},
+                after_json={"current_version_id": version_id},
+                created_at=datetime.now(timezone.utc)
+            )
+            db.add(audit_log)
+            
+            db.commit()
+        
+        return {"message": f"Successfully rolled back to version {version_id}"}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error rolling back version", job_id=job_id, version_id=version_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+# ============================================================================
+# EXPORT ROUTES
+# ============================================================================
+
+@app.post("/jobs/{job_id}/export")
+async def create_export(job_id: int):
+    """Create Excel export for a job's current version."""
+    try:
+        with get_db_session() as db:
+            # Get job and current version
+            job = db.query(Job).filter(Job.id == job_id).first()
+            if not job or not job.current_version_id:
+                raise HTTPException(status_code=404, detail="Job or current version not found")
+            
+            # Get records for current version
+            records = db.query(Record).filter(Record.version_id == job.current_version_id).order_by(Record.row_idx).all()
+            
+            if not records:
+                raise HTTPException(status_code=400, detail="No records found for export")
+            
+            # Create Excel file
+            from .agents.exporter_excel import _create_excel_file, _store_excel_file, _create_export_record
+            
+            excel_bytes = _create_excel_file(job_id, job.current_version_id, [{"row_idx": r.row_idx, "data": r.payload_json} for r in records])
+            file_uri = _store_excel_file(job_id, job.current_version_id, excel_bytes)
+            export_id = _create_export_record(job_id, job.current_version_id, file_uri, excel_bytes)
+            
+            return {"export_id": export_id, "file_uri": file_uri}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error creating export", job_id=job_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.get("/exports/{export_id}/download")
+async def download_export(export_id: int):
+    """Download Excel export file."""
+    try:
+        with get_db_session() as db:
+            export = db.query(Export).filter(Export.id == export_id).first()
+            if not export:
+                raise HTTPException(status_code=404, detail="Export not found")
+            
+            # Extract object key from S3 URI
+            if not export.file_uri.startswith("s3://"):
+                raise HTTPException(status_code=400, detail="Invalid file URI")
+            
+            object_key = export.file_uri.replace("s3://hilabs-artifacts/", "")
+            
+            # Get file from MinIO
+            file_data = storage_client.get_bytes("hilabs-artifacts", object_key)
+            
+            # Generate filename
+            filename = f"roster_export_job_{export.job_id}_v{export.version_id}.xlsx"
+            
+            return Response(
+                content=file_data,
+                media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                headers={"Content-Disposition": f"attachment; filename={filename}"}
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error downloading export", export_id=export_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/issues/{issue_id}/explain")
+async def explain_issue(issue_id: int):
+    """Generate natural language explanation for a validation issue using LLM."""
+    try:
+        with get_db_session() as db:
+            # Get issue record
+            issue = db.query(Issue).filter(Issue.id == issue_id).first()
+            if not issue:
+                raise HTTPException(status_code=404, detail="Issue not found")
+            
+            # Get LLM client
+            llm_client = get_llm_client()
+            if not llm_client:
+                return {
+                    "explanation": "LLM service is not available. Please check the issue details manually.",
+                    "llm_available": False
+                }
+            
+            # Prepare issue data for LLM
+            issue_data = {
+                "field": issue.field,
+                "level": issue.level.value,
+                "message": issue.message,
+                "row_idx": issue.row_idx
+            }
+            
+            # Get LLM explanation
+            explanation = llm_client.explain_validation_issue(issue_data)
+            
+            return {
+                "explanation": explanation,
+                "llm_available": True,
+                "issue_id": issue_id
+            }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Issue explanation failed", issue_id=issue_id, error=str(e))
+        return {
+            "explanation": f"Failed to generate explanation: {str(e)}",
+            "llm_available": True,
+            "error": True
+        }
+
+def _validate_record_data(record_data: dict, row_idx: int) -> List[Dict[str, Any]]:
+    """Simple validation for edited record data."""
+    issues = []
+    
+    # Check required fields
+    required_fields = ["NPI", "Provider Name", "Specialty", "Effective Date"]
+    for field in required_fields:
+        if not record_data.get(field, "").strip():
+            issues.append({
+                "row_idx": row_idx,
+                "field": field,
+                "level": "error",
+                "message": f"Required field '{field}' is missing"
+            })
+    
+    # Check NPI format
+    npi = record_data.get("NPI", "").strip()
+    if npi and (len(npi) != 10 or not npi.isdigit()):
+        issues.append({
+            "row_idx": row_idx,
+            "field": "NPI",
+            "level": "error",
+            "message": f"Invalid NPI format: {npi}"
+        })
+    
+    return issues
 
 # Import net_guard to ensure it's installed
 from . import net_guard  # noqa: F401

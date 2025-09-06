@@ -11,31 +11,13 @@ import time
 import json
 import requests
 from typing import Dict, Any, List
-from prometheus_client import Counter, Histogram
-import structlog
 
 from ..config import settings
 from ..storage import storage_client
+from ..metrics import track_agent_metrics, track_vlm_invocation, get_logger
 
-logger = structlog.get_logger(__name__)
-
-# Prometheus metrics
-AGENT_RUNS_TOTAL = Counter(
-    "agent_runs_total", "Total agent runs", ["agent"]
-)
-AGENT_LATENCY_SECONDS = Histogram(
-    "agent_latency_seconds", "Agent execution latency", ["agent"]
-)
-VLM_REQUESTS_TOTAL = Counter(
-    "vlm_requests_total", "Total VLM requests", ["status"]
-)
-VLM_LATENCY_SECONDS = Histogram(
-    "vlm_latency_seconds", "VLM request latency"
-)
-VLM_INVOCATIONS_TOTAL = Counter(
-    "vlm_invocations_total", "Total VLM invocations", ["method"]
-)
-
+logger = get_logger(__name__)
+@track_agent_metrics("vlm_client")
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Process documents using Vision Language Model.
@@ -116,8 +98,8 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
                     vlm_metadata["methods_used"].append(result["method"])
                     vlm_metadata["total_processing_time"] += result["processing_time"]
                     
-                    # Increment VLM invocations counter
-                    VLM_INVOCATIONS_TOTAL.labels(method=result["method"]).inc()
+                    # Track VLM invocation
+                    track_vlm_invocation(result.get("method", "unknown"), "success")
                 else:
                     vlm_metadata["failed_extractions"] += 1
                     

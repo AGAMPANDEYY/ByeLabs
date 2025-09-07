@@ -1,0 +1,5 @@
+Please extract provider roster information from the following email content:
+
+{email}
+
+Return the data in the exact JSON format specified in the system prompt.

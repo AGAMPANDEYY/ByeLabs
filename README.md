@@ -6,18 +6,20 @@
 
 > **Touchless end-to-end roster processing** — from raw emails (`.eml`, PDFs, images, HTML tables, CSV/XLSX) to a perfectly formatted Excel in one click.
 > **Everything runs 100% locally** (no proprietary APIs, no third-party uploads).
-> Built with a **multi-agent pipeline**, **open-source LLM/VLM**, RL training with Group Reward Preference Optimisation policies on synthetic dataset, versioning + rollback, analytics, and production-style observability.
+> Built with a **multi-agent pipeline**, **open-source LLM**, RL training with Group Reward Policy Optimisation policies on synthetic dataset, versioning + rollback, analytics, and production-style observability.
+
+**Video Demo** : [link](https://drive.google.com/file/d/1UGrqXEa0UGTlACpZGqsCPc3Td0zcPvym/view?usp=sharing)
 
 ---
 
 ## We thought Scailibity, Architectures and AI!
 
 * **Local-only by design:** All parsing, model inference, training, storage, and analytics run on your machine with Docker/Compose or a single Python env. Zero calls to closed APIs.
-* **Agentic AI + Rules:** A **multi-agent** workflow that prefers deterministic parsers first, then escalates to **open-source LLMs/VLM** (e.g., MiniCPM-V, LayoutLMv3) to crush tricky PDFs/scans.
+* **Agentic AI + Rules:** A **multi-agent** workflow that prefers deterministic parsers first, then escalates to **open-source SLM (Qwen3-4B-Instruct)** to crush tricky PDFs/scans.
 * **Data quality you can trust:** Strong normalization + validation (NPI Luhn, phone, address, dates, duplicates, schema checks) and **human-in-the-loop review**.
 * **Auditability built-in:** Every change creates a **version**; export binds to a version; you can **diff & rollback** anytime.
 * **Observability like production:** Metrics, logs, and traces (Prometheus + OpenTelemetry + Grafana) so judges can *see* the system working.
-* **Research-grade training:** We trained a **small local model (SLM)** with **GRPO** (Group-Relative Preference Optimization) using **silver-labeled weak supervision** + LoRA adapters, so it learns our schema and avoids hallucinations.
+* **Research-grade training:** We finetuned a **small language model (SLM)** with **GRPO** (Group-Relative Policy Optimization) using **silver-labeled weak supervision** + LoRA adapters, so it learns our schema and avoids hallucinations.
 
 > We optimized for **hackathon reality**: limited time, no external services, but architected for **scale and maintainability** if this graduates into a product.
 
@@ -67,7 +69,23 @@ wget https://huggingface.co/P3g4su5/ByeLabs-LoRA/resolve/main/adapter.gguf
 
 # Start llama.cpp server
 cd ..
-docker run -d --name llama-server -p 5000:8080 -v $(pwd)/models:/models ghcr.io/ggerganov/llama.cpp:server -m /models/adapter.gguf --host 0.0.0.0 --port 8080
+
+# For CPU Inference
+docker run -d --name llama-server \
+  -p 5000:8080 \
+  -v $(pwd)/models:/models \
+  ghcr.io/ggerganov/llama.cpp:server \
+  -m /models/adapter.gguf \
+  --host 0.0.0.0 --port 8080
+
+# For GPU Inference
+docker run -d --name llama-server \
+  --gpus all \
+  -p 5000:8080 \
+  -v $(pwd)/models:/models \
+  ghcr.io/ggml-org/llama.cpp:server-cuda \
+  -m /models/adapter.gguf \
+  --host 0.0.0.0 --port 8080
 ```
 
 ### 5. Test the System
@@ -130,7 +148,7 @@ docker system prune -a
 ### System Architecture
 - **Backend**: FastAPI + PostgreSQL + MinIO + RabbitMQ + Celery
 - **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
-- **LLM**: Local llama.cpp server with Qwen 3.4B model
+- **LLM**: Local llama.cpp server with **Qwen3-4B-Instruct** model
 - **Processing**: Multi-agent pipeline with spaCy NLP + LLM extraction
 - **Storage**: MinIO for files, PostgreSQL for metadata
 - **Queue**: RabbitMQ + Celery for async processing
@@ -141,10 +159,8 @@ docker system prune -a
 
 * **Email ingestion:** `.eml` upload (and optional local SMTP via Mailpit) with attachment handling.
 * **Format coverage:** HTML body tables, CSV/XLSX, native PDFs, scanned PDFs/images.
-* **Multi-agent pipeline:** Intake → Classification → Extraction (rules) → **VLM fallback** → Normalization → Validation → Versioning → Excel export.
-* **AI stack (all local):**
-  * **Doc model:** LayoutLMv3 (for doc-layout aware text).
-  * **SLM (local LLM):** fine-tuned via **GRPO** with LoRA adapters.
+* **Multi-agent pipeline:** Intake → Classification → Extraction (rules) → **LLM fallback** → Normalization → Validation → Versioning → Excel export.
+* **SLM (local LLM):** fine-tuned via **GRPO** with LoRA adapters.
 * **Normalization:** phone (E.164), address (usaddress/libpostal), dates (dateparser with `MDY`), NPI checksum (Luhn with `80840`).
 * **Validation:** required fields, enumerations, duplicates, cross-field rules, confidence thresholds.
 * **Review UI:** spreadsheet-like editor, side-by-side original preview, issues list, **diff + rollback**.
@@ -157,27 +173,21 @@ docker system prune -a
 
 **Goal:** make a small local model reliably output schema-exact JSON rows from messy text/PDF extractions.
 
-* **Silver labels (weak supervision):**
-  We bootstrap labels by:
-
-  * Running deterministic extractors on the 3 provided samples → canonical Excel/JSON.
+* **Training Dataset:**
+  * Rigorously prompting **Gemini 2.5 Pro** to craft variety of emails
   * Programmatically **augmenting** structures (names, NPIs, phones, addresses, row permutations, header variants).
-  * Generating **preference pairs**: (good JSON) vs (perturbed JSON with realistic mistakes: wrong formats, missing required fields, invalid NPIs), to train **preferences** not just answers.
 
 * **Reward design (per sample):**
-
   * **Completeness** (required fields present)
   * **Accuracy** (matches canonical/normalized values)
   * **Format** (NPI/phone/date/address format rules)
   * **Consistency** (cross-field constraints, duplicates)
-  * Weighted into a single **scalar reward** in `[0,1]`.
 
-* **GRPO (Group-Relative Preference Optimization):**
-
+* **GRPO (Group-Relative Policy Optimization):**
   * For each prompt, sample multiple candidate outputs from the SLM (group).
   * Score each with the reward function.
   * Optimize the policy to increase probability of higher-scoring candidates **relative** to lower-scoring ones in the same group (stable, offline-friendly alternative to standard RLHF).
-  * Implemented as a lightweight custom trainer on top of 🤗 Transformers + PEFT (LoRA), fully **offline**.
+  * Implemented as a lightweight custom trainer on top of 🤗 Transformers + PEFT (LoRA) + UnslothAI, fully **offline**.
 
 * **Why GRPO here?**
   With tiny data and strict schema, **relative, reward-shaped learning** aligns the SLM to *prefer* well-formed, schema-valid outputs and reject hallucinations.
@@ -198,7 +208,7 @@ docker system prune -a
    * CSV/XLSX → `pandas.read_csv/excel`
    * PDF-native → `pdfplumber` + `camelot` lattice/stream (pick max coverage/headers)
    * Plain text → table inference + regex heuristics
-4. **VLM Assist (fallback/augment)** – MiniCPM-V for PDF scans/images and low-confidence segments; prompts are schema-aware and ask for **JSON only**.
+4. **LLM Assist (optional)** – **Qwen3-4B-Instruct** for low-confidence segments; prompts are schema-aware and ask for **JSON only**.
 5. **Normalizer** – `phonenumbers`, `usaddress/libpostal`, `dateparser`, **NPI Luhn**; log changes + confidences.
 6. **Validator** – required fields, enumerations, duplicates, cross-field (e.g., effective ≤ termination), per-cell issues with suggestions.
 7. **Versioner** – snapshot rows; every edit creates a new **version**; **rollback** anytime.
@@ -213,7 +223,7 @@ docker system prune -a
 * **Workers/Queue:** Celery + RabbitMQ (async, scalable).
 * **Data layer:** PostgreSQL, MinIO (S3-compatible), Redis.
 * **Doc parsing:** pdfplumber, camelot, PyMuPDF, BeautifulSoup, pandas.
-* **NLP/NLU:** transformers, PyTorch, **LayoutLMv3** (doc-aware), **MiniCPM-V** (VLM).
+* **NLP/NLU:** transformers, PyTorch, llama.cpp
 * **Validation:** phonenumbers, usaddress, libpostal, dateparser.
 * **Observability:** Prometheus, OpenTelemetry, Grafana.
 * **DevOps:** Docker + Docker Compose (single command to spin up).
@@ -258,45 +268,39 @@ This brings up:
 
 ## 🧪 Running models locally
 
-* **VLM (MiniCPM-V):** start the local service (Docker image or Python script using OpenBMB repo).
-* **LayoutLMv3:** loaded via `transformers` from a local cache (weights included or mounted).
 * **SLM (our fine-tuned LoRA):** load base model + LoRA adapters from local path.
 * **Ollama / llama.cpp** (optional): host small text models locally for lightweight classification.
 
-> The repo ships with **offline model cache instructions** (weights folder or HF cache mirror) and **env toggles** to disable/enable VLM usage per job.
+> The repo ships with **offline model cache instructions** (weights folder or HF cache mirror) and **env toggles** to disable/enable LLM usage per job.
 
 ---
 
 ## Training (local) — **GRPO + LoRA** on SLM
 
-1. **Prepare silver data**
-
-   ```bash
-   python tools/gen_silver_data.py --inputs data/samples/ --out data/silver/
-   python tools/make_preferences.py --in data/silver/ --out data/prefs/
+1. **Install required packages**
+  ```bash
+   pip3 install -r training/requirements.txt
    ```
+
 2. **Train LoRA adapters with GRPO**
 
    ```bash
-   python training/run_grpo.py \
-     --base_model ./models/slm-base \
-     --data_dir data/prefs \
-     --output_dir ./models/slm-grpo-lora \
-     --lora_r 16 --lora_alpha 32 --lora_dropout 0.1 \
-     --lr 1e-5 --batch 4 --grad_accum 8 --epochs 3
+   python training/train.py \
+     --base_model "Qwen3-4B-Instruct-2507" \
+     --data_dir training/dataset \
+     --output_dir ./models/grpo_lora
    ```
-3. **Evaluate**
 
-   ```bash
-   python training/eval.py --model ./models/slm-grpo-lora --gold data/gold/
-   ```
+3. **Convert trained LoRA to GGUF format using [llama.cpp](https://github.com/ggml-org/llama.cpp/blob/master/convert_lora_to_gguf.py)**
+
+    ```bash
+    python3 convert_lora_to_gguf.py --base-model-id "Qwen3-4B-Instruct-2507-GGUF" --outtype f16 --outfile ./models/adapter.gguf ./models/grpo_lora/
+    ```
 4. **Serve locally**
 
    ```bash
-   python services/slm_server.py --adapters ./models/slm-grpo-lora
+   docker run -d --name llama-server -p 5000:8080 -v $(pwd)/models:/models ghcr.io/ggerganov/llama.cpp:server -m /models/adapter.gguf --host 0.0.0.0 --port 8080
    ```
-
-*All scripts operate on local files; no internet required.*
 
 ---
 
@@ -316,7 +320,7 @@ This brings up:
 
 ## Analytics & Observability
 
-* **Metrics:** throughput, latency per stage, extractor coverage, **VLM fallback rate**, validation error mix, edits per job, export counts.
+* **Metrics:** throughput, latency per stage, extractor coverage, **LLM fallback rate**, validation error mix, edits per job, export counts.
 * **Traces:** one trace per job across agents; instant root-cause when something slows/fails.
 * **Dashboards:** pipeline SLOs, hot senders, error heatmaps, cost/time breakdowns.
 
@@ -374,9 +378,6 @@ open http://localhost:3000
 # 3) upload a .eml and click "Process to Excel"
 ```
 
-> GPU available? Set `VLM_GPU=1` and map `--gpus all` in compose for MiniCPM-V acceleration.
-
----
 
 ## Design decisions (and why)
 
@@ -401,7 +402,7 @@ open http://localhost:3000
 
 ##  How to cite / inspiration (open source)
 
-* MiniCPM-V (OpenBMB), LayoutLMv3 (HF Transformers)
+* Qwen3-4B-Instruct-2507 (Qwen) and Qwen3-4B-Instruct-2507-GGUF (UnslothAI)
 * pdfplumber, Camelot, PyMuPDF, BeautifulSoup, pandas
 * phonenumbers, usaddress, libpostal, dateparser
 * Celery, RabbitMQ, FastAPI, Next.js, Tailwind, Prometheus, Grafana
@@ -415,7 +416,7 @@ open http://localhost:3000
 * [x] Public repo with **full code and run script(s)**
 * [x] **README** (this file), exact run instructions
 * [x] **No uploads** to third-party servers; **no proprietary LLM APIs**
-* [x] LLM/VLM run **locally** (weights stored locally / mounted)
+* [x] LLM run **locally** (weights stored locally / mounted)
 * [x] Reproducible with Docker Compose on any laptop
 
 ---

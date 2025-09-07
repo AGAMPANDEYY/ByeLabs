@@ -21,6 +21,10 @@
 
 ##  System Overview
 
+<img width="3768" height="1680" alt="image" src="https://github.com/user-attachments/assets/5f71758e-8f08-4c67-8e21-5042c761cf2e" />
+
+
+
 ---
 
 ## Features

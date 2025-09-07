@@ -116,19 +116,38 @@ services:
         condition: service_healthy
 
   # VLM Service
-  vlm:
-    build:
-      context: ./vlm
-      dockerfile: Dockerfile.simple
+  # vlm:
+  #   build:
+  #     context: ./vlm
+  #     dockerfile: Dockerfile.simple
+  #   ports:
+  #     - "8080:8080"
+  #   environment:
+  #     - VLM_ENABLED=true
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+  #     interval: 30s
+  #     timeout: 10s
+  #     retries: 3
+
+  llm:
+    image: ghcr.io/ggml-org/llama.cpp:server
     ports:
-      - "8080:8080"
-    environment:
-      - VLM_ENABLED=true
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+      - "5000:5000"
+    command: 
+      -hf unsloth/Qwen3-4B-Instruct-2507-GGUF
+      --lora /models/adapter.gguf
+      --host 0.0.0.0
+      --port 5000
+      - --api-only
+    volumes:
+      - ./models:/models
+      
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
 
 volumes:
   postgres_data:

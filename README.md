@@ -196,7 +196,7 @@ docker system prune -a
 
 ---
 
-## Multi-Agent pipeline (logic you can reason about)
+## Multi-Agent pipeline - LangGraph
 
 **Rule-first. AI-assist only when needed.** That’s how we keep it fast, cheap, and reliable.
 

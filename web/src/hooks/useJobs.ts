@@ -52,7 +52,7 @@ export function useJobs() {
     fetchJobs()
   }, [fetchJobs])
 
-  // Poll for job updates every 5 seconds
+  // Poll for job updates every 10 seconds
   useEffect(() => {
     const interval = setInterval(async () => {
       if (Array.isArray(jobs)) {
@@ -76,20 +76,12 @@ export function useJobs() {
         
         if (stuckJobs.length > 0) {
           console.warn('Detected stuck jobs:', stuckJobs.map(j => j.id))
-          // Call backend to mark stuck jobs as failed
-          try {
-            await apiClient.checkStuckJobs()
-            // Refresh jobs to get updated status
-            fetchJobs()
-          } catch (error) {
-            console.error('Failed to check stuck jobs:', error)
-            // If the endpoint is not available, just refresh jobs to get updated status
-            // The backend might have already marked them as failed
-            fetchJobs()
-          }
+          // Temporarily disable stuck jobs checking to prevent 405 errors
+          // Just refresh jobs to get updated status
+          fetchJobs()
         }
       }
-    }, 5000)
+    }, 10000)
 
     return () => clearInterval(interval)
   }, [jobs, fetchJobs])
@@ -136,7 +128,7 @@ export function useJob(jobId: number) {
 
     const interval = setInterval(() => {
       fetchJob()
-    }, 3000)
+    }, 5000)
 
     return () => clearInterval(interval)
   }, [job, fetchJob])

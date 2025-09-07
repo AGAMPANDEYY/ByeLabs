@@ -2,7 +2,7 @@ import { cn } from "@/lib/utils"
 import { CheckCircle, Clock, AlertCircle, XCircle, FileText, Loader2 } from "lucide-react"
 
 export interface StatusBadgeProps {
-  status: 'pending' | 'processing' | 'completed' | 'error' | 'needs_review'
+  status: 'pending' | 'processing' | 'completed' | 'error' | 'needs_review' | 'ready' | 'failed' | 'cancelled'
   errorMessage?: string
   className?: string
 }
@@ -23,9 +23,24 @@ const statusConfig = {
     className: 'bg-green-100 text-green-800',
     icon: CheckCircle,
   },
+  ready: {
+    label: 'Completed',
+    className: 'bg-green-100 text-green-800',
+    icon: CheckCircle,
+  },
   error: {
     label: 'Error',
     className: 'bg-red-100 text-red-800',
+    icon: XCircle,
+  },
+  failed: {
+    label: 'Failed',
+    className: 'bg-red-100 text-red-800',
+    icon: XCircle,
+  },
+  cancelled: {
+    label: 'Cancelled',
+    className: 'bg-gray-100 text-gray-800',
     icon: XCircle,
   },
   needs_review: {
@@ -36,11 +51,11 @@ const statusConfig = {
 }
 
 export function StatusBadge({ status, errorMessage, className }: StatusBadgeProps) {
-  const config = statusConfig[status]
+  const config = statusConfig[status] || statusConfig.error // Fallback to error config
   const Icon = config.icon
   
   // Check if this is a timeout error
-  const isTimeout = status === 'error' && errorMessage?.includes('timeout')
+  const isTimeout = (status === 'error' || status === 'failed') && errorMessage?.includes('timeout')
   const displayLabel = isTimeout ? 'Timeout' : config.label
 
   return (

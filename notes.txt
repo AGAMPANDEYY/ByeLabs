@@ -71,3 +71,42 @@ docker logs -f <container_name>
 
 # View logs since specific time
 docker logs --since 10m <container_name>
+
+
+
+
+
+# Stop all running containers
+docker compose -f docker-compose.simple.yml down
+
+# Remove all containers, networks, and volumes
+docker compose -f docker-compose.simple.yml down -v --remove-orphans
+
+# Remove any dangling images
+docker image prune -f
+
+#USE WITHOUT VLMS 
+
+docker compose -f docker-compose.simple.yml up -d --build db mq minio mailpit api worker
+
+#TEST
+
+# 1. Check system health
+Write-Host "=== Checking System Health ===" -ForegroundColor Green
+curl.exe http://localhost:8000/health
+
+# 2. Upload sample email
+Write-Host "`n=== Uploading Sample Email ===" -ForegroundColor Green
+$uploadResponse = curl.exe -F "file=@samples/Sample-1.eml" http://localhost:8000/ingest
+Write-Host "Upload Response: $uploadResponse"
+
+# 3. Extract job_id from response (you'll need to do this manually)
+Write-Host "`n=== Please note the job_id from the response above ===" -ForegroundColor Yellow
+
+# 4. Check jobs list
+Write-Host "`n=== Checking Jobs List ===" -ForegroundColor Green
+curl.exe http://localhost:8000/jobs
+
+# 5. Check worker logs
+Write-Host "`n=== Checking Worker Logs ===" -ForegroundColwhor Green
+docker compose -f docker-compose.simple.yml logs worker --tail 10

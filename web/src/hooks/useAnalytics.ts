@@ -23,7 +23,10 @@ export function useAnalytics() {
       const data = await apiClient.getAnalytics()
       setAnalytics(data)
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch analytics')
+      // Only show error on initial load, not on periodic refreshes
+      if (analytics.totalJobs === 0) {
+        setError(err instanceof Error ? err.message : 'Failed to fetch analytics')
+      }
       // Fallback to mock data if API fails
       setAnalytics({
         totalJobs: 1247,
@@ -37,17 +40,17 @@ export function useAnalytics() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [analytics.totalJobs])
 
   useEffect(() => {
     fetchAnalytics()
   }, [fetchAnalytics])
 
-  // Refresh analytics every 30 seconds
+  // Refresh analytics every 60 seconds
   useEffect(() => {
     const interval = setInterval(() => {
       fetchAnalytics()
-    }, 30000)
+    }, 60000)
 
     return () => clearInterval(interval)
   }, [fetchAnalytics])

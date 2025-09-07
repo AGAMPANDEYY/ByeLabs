@@ -108,7 +108,6 @@ def _classify_email_body(email_body: Dict[str, Any], llm_client=None) -> Dict[st
         if llm_client:
             try:
                 # Extract table headers for LLM analysis
-                import re
                 table_headers = re.findall(r'<th[^>]*>(.*?)</th>', html_content, re.IGNORECASE | re.DOTALL)
                 table_headers = [re.sub(r'<[^>]+>', '', h).strip() for h in table_headers]
                 

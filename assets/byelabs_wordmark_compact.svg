@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="420" viewBox="0 0 1600 420">
+  <defs>
+    <style>
+      @font-face {
+        font-family: 'Inter-Fallback';
+        src: local('Inter'), local('Poppins'), local('Segoe UI'), local('Arial');
+      }
+    </style>
+  </defs>
+  <rect width="100%" height="100%" fill="#ffffff"/>
+  <!-- Compact wordmark: ByeLabs (no space) -->
+  <g transform="translate(80,85)">
+    <text y="240" font-family="Inter-Fallback, ui-sans-serif, system-ui" font-weight="800" font-size="260" letter-spacing="1">
+      <tspan x="0" fill="#2563EB">Bye</tspan><tspan fill="#111827">Labs</tspan>
+    </text>
+    <text x="1320" y="105" font-family="Inter-Fallback, ui-sans-serif, system-ui" font-weight="700" font-size="36" fill="#111827">™</text>
+  </g>
+</svg>

@@ -2,51 +2,46 @@ import { cn } from "@/lib/utils"
 import { CheckCircle, Clock, AlertCircle, XCircle, FileText, Loader2 } from "lucide-react"
 
 export interface StatusBadgeProps {
-  status: 'pending' | 'processing' | 'needs_review' | 'ready' | 'exported' | 'failed' | 'cancelled'
+  status: 'pending' | 'processing' | 'completed' | 'error' | 'needs_review'
+  errorMessage?: string
   className?: string
 }
 
 const statusConfig = {
   pending: {
     label: 'Pending',
-    className: 'bg-gray-100 text-gray-700',
+    className: 'bg-yellow-100 text-yellow-800',
     icon: Clock,
   },
   processing: {
     label: 'Processing',
-    className: 'bg-primary-100 text-primary-700',
+    className: 'bg-blue-100 text-blue-800',
     icon: Loader2,
   },
-  needs_review: {
-    label: 'Needs Review',
-    className: 'bg-amber-100 text-amber-700',
-    icon: AlertCircle,
-  },
-  ready: {
-    label: 'Ready',
-    className: 'bg-green-100 text-green-700',
+  completed: {
+    label: 'Completed',
+    className: 'bg-green-100 text-green-800',
     icon: CheckCircle,
   },
-  exported: {
-    label: 'Exported',
-    className: 'bg-indigo-100 text-indigo-700',
-    icon: FileText,
-  },
-  failed: {
-    label: 'Failed',
-    className: 'bg-rose-100 text-rose-700',
+  error: {
+    label: 'Error',
+    className: 'bg-red-100 text-red-800',
     icon: XCircle,
   },
-  cancelled: {
-    label: 'Cancelled',
-    className: 'bg-gray-100 text-gray-500',
-    icon: XCircle,
+  needs_review: {
+    label: 'Completed (with missing info)',
+    className: 'bg-green-100 text-green-800',
+    icon: AlertCircle,
   },
 }
 
-export function StatusBadge({ status, className }: StatusBadgeProps) {
+export function StatusBadge({ status, errorMessage, className }: StatusBadgeProps) {
   const config = statusConfig[status]
   const Icon = config.icon
+  
+  // Check if this is a timeout error
+  const isTimeout = status === 'error' && errorMessage?.includes('timeout')
+  const displayLabel = isTimeout ? 'Timeout' : config.label
 
   return (
     <span
@@ -63,7 +58,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
           status === 'processing' && 'animate-spin'
         )} 
       />
-      {config.label}
+      {displayLabel}
     </span>
   )
 }

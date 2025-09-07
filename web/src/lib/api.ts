@@ -1,203 +1,227 @@
-const API_BASE_URL = 'http://localhost:8000'
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
 export interface Job {
   id: number
-  status: 'pending' | 'processing' | 'needs_review' | 'ready' | 'failed' | 'cancelled'
+  status: 'pending' | 'processing' | 'completed' | 'error' | 'needs_review'
   created_at: string
   updated_at: string
-  subject?: string
-  from_addr?: string
-  to_addr?: string
-  current_version_id?: number
-  issues_count?: number
-  vlm_used?: boolean
-}
-
-export interface JobDetail extends Job {
-  email_metadata: {
-    message_id: string
+  email?: {
+    id: number
     from_addr: string
-    to_addr: string
     subject: string
     received_at: string
   }
-  artifacts: Array<{
-    type: string
-    document_type: string
-    content?: string
-    uri?: string
-    filename?: string
-    content_type?: string
-    size?: number
-  }>
-  issues: Array<{
+  current_version_id?: number
+  email_subject?: string
+  email_from?: string
+  total_records?: number
+  processed_records?: number
+  error_message?: string
+  // Legacy fields for backward compatibility
+  subject?: string
+  from_addr?: string
+  // Job details fields
+  artifacts?: {
+    raw_email?: string
+    exports?: Export[]
+  }
+  current_version?: {
     id: number
-    row_idx?: number
-    field?: string
-    level: 'error' | 'warning' | 'info'
-    message: string
-  }>
-  rows?: Array<{
-    row_idx: number
-    data: Record<string, any>
-  }>
+    author: string
+    reason: string
+    created_at: string
+    record_count: number
+  }
+  issues_summary?: {
+    error: number
+    warning: number
+    info: number
+  }
+  issues_count?: number
 }
 
-export interface Version {
-  id: number
-  job_id: number
-  parent_version_id?: number
-  author: string
-  reason: string
-  created_at: string
+export interface AnalyticsData {
+  totalJobs: number
+  completedJobs: number
+  pendingJobs: number
+  errorJobs: number
+  avgProcessingTime: number
+  totalExports: number
+  successRate: number
 }
 
 export interface Export {
   id: number
   job_id: number
-  version_id: number
-  file_uri: string
-  checksum: string
   created_at: string
+  object_key?: string
+  filename?: string
+  status: 'pending' | 'completed' | 'error'
+  version_id?: number
+  file_uri?: string
+  checksum?: string
 }
 
-export interface AnalyticsSummary {
-  jobs_today: number
-  success_rate: number
-  avg_processing_time: number
-  vlm_usage_rate: number
-  top_errors: Array<{
-    error: string
-    count: number
-  }>
-}
+class ApiClient {
+  private baseUrl: string
 
-// API Helper Functions
-export async function apiRequest<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
-  const url = `${API_BASE_URL}${endpoint}`
-  
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  })
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`API Error: ${response.status} - ${error}`)
+  constructor(baseUrl: string = API_BASE_URL) {
+    this.baseUrl = baseUrl
   }
 
-  return response.json()
-}
+  private async request<T>(
+    endpoint: string,
+    options: RequestInit = {},
+    timeoutMs: number = 30000
+  ): Promise<T> {
+    const url = `${this.baseUrl}${endpoint}`
+    
+    // Create abort controller for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
+    
+    const config: RequestInit = {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      signal: controller.signal,
+      ...options,
+    }
 
-// Job API
-export async function getJobs(): Promise<Job[]> {
-  return apiRequest<Job[]>('/jobs')
-}
+    try {
+      const response = await fetch(url, config)
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`)
+      }
 
-export async function getJob(id: number): Promise<JobDetail> {
-  return apiRequest<JobDetail>(`/jobs/${id}`)
-}
-
-export async function processJob(id: number, forceVlm = false): Promise<{ job_id: number }> {
-  const params = forceVlm ? '?force_vlm=true' : ''
-  return apiRequest<{ job_id: number }>(`/jobs/${id}/process${params}`, {
-    method: 'POST',
-  })
-}
-
-export async function ingestEml(file: File): Promise<{ job_id: number }> {
-  const formData = new FormData()
-  formData.append('eml', file)
-  
-  const response = await fetch(`${API_BASE_URL}/ingest`, {
-    method: 'POST',
-    body: formData,
-  })
-
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Upload Error: ${response.status} - ${error}`)
+      return await response.json()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error(`Request timeout after ${timeoutMs}ms`)
+      }
+      console.error(`API request failed for ${endpoint}:`, error)
+      throw error
+    }
   }
 
-  return response.json()
-}
-
-// Version API
-export async function getJobVersions(jobId: number): Promise<Version[]> {
-  return apiRequest<Version[]>(`/jobs/${jobId}/versions`)
-}
-
-export async function rollbackVersion(jobId: number, versionId: number): Promise<void> {
-  return apiRequest<void>(`/jobs/${jobId}/versions/${versionId}/rollback`, {
-    method: 'POST',
-  })
-}
-
-// Edit API
-export async function editCell(
-  jobId: number,
-  rowIdx: number,
-  field: string,
-  value: string
-): Promise<{ version_id: number }> {
-  return apiRequest<{ version_id: number }>(`/jobs/${jobId}/edit`, {
-    method: 'POST',
-    body: JSON.stringify({ row_idx: rowIdx, field, value }),
-  })
-}
-
-// Export API
-export async function exportJob(jobId: number): Promise<{ export_id: number; file_uri: string }> {
-  return apiRequest<{ export_id: number; file_uri: string }>(`/jobs/${jobId}/export`, {
-    method: 'POST',
-  })
-}
-
-export async function getExports(): Promise<Export[]> {
-  return apiRequest<Export[]>('/exports')
-}
-
-export async function downloadExport(exportId: number): Promise<Blob> {
-  const response = await fetch(`${API_BASE_URL}/exports/${exportId}/download`)
-  
-  if (!response.ok) {
-    const error = await response.text()
-    throw new Error(`Download Error: ${response.status} - ${error}`)
+  // Job Management
+  async getJobs(): Promise<Job[]> {
+    const response = await this.request<{jobs: Job[], total: number, skip: number, limit: number, has_more: boolean}>('/jobs')
+    return response.jobs
   }
 
-  return response.blob()
-}
+  async getJob(jobId: number): Promise<Job> {
+    return this.request<Job>(`/jobs/${jobId}`)
+  }
 
-// Analytics API
-export async function getAnalyticsSummary(): Promise<AnalyticsSummary> {
-  try {
-    return apiRequest<AnalyticsSummary>('/analytics/summary')
-  } catch (error) {
-    // Fallback to parsing metrics if analytics endpoint doesn't exist
-    return getMetricsSummary()
+  async uploadEmail(file: File): Promise<Job> {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    // Create abort controller for upload timeout (2 minutes)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 120000)
+
+    try {
+      const response = await fetch(`${this.baseUrl}/ingest`, {
+        method: 'POST',
+        body: formData,
+        signal: controller.signal,
+      })
+
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        throw new Error(`Upload failed: ${response.status}`)
+      }
+
+      const result = await response.json()
+      // The ingest endpoint returns job_id, not job object
+      // We need to fetch the full job details
+      return this.getJob(result.job_id)
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Upload timeout after 2 minutes')
+      }
+      throw error
+    }
+  }
+
+  async resumeJob(jobId: number): Promise<Job> {
+    return this.request<Job>(`/jobs/${jobId}/process`, {
+      method: 'POST',
+    }, 180000) // 3 minutes timeout for processing
+  }
+
+  // Export Management
+  async getJobExports(jobId: number): Promise<Export[]> {
+    return this.request<Export[]>(`/jobs/${jobId}/exports`)
+  }
+
+  async createExport(jobId: number): Promise<Export> {
+    return this.request<Export>(`/jobs/${jobId}/export`, {
+      method: 'POST',
+    }, 60000) // 1 minute timeout for export creation
+  }
+
+  async downloadExport(exportId: number): Promise<Blob> {
+    // Create abort controller for download timeout (30 seconds)
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 30000)
+
+    try {
+      const response = await fetch(`${this.baseUrl}/exports/${exportId}/download`, {
+        signal: controller.signal,
+      })
+      
+      clearTimeout(timeoutId)
+      
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`)
+      }
+
+      return await response.blob()
+    } catch (error) {
+      clearTimeout(timeoutId)
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new Error('Download timeout after 30 seconds')
+      }
+      throw error
+    }
+  }
+
+  // Analytics
+  async getAnalytics(): Promise<AnalyticsData> {
+    return this.request<AnalyticsData>('/analytics')
+  }
+
+  // Health Check
+  async healthCheck(): Promise<{ status: string }> {
+    return this.request<{ status: string }>('/health')
+  }
+
+  // Timeout Management
+  async checkStuckJobs(): Promise<{
+    message: string
+    stuck_jobs_found: number
+    jobs_updated: number
+    cutoff_time: string
+  }> {
+    return this.request<{
+      message: string
+      stuck_jobs_found: number
+      jobs_updated: number
+      cutoff_time: string
+    }>('/jobs/check-timeouts', {
+      method: 'POST',
+    })
   }
 }
 
-async function getMetricsSummary(): Promise<AnalyticsSummary> {
-  const response = await fetch(`${API_BASE_URL}/metrics`)
-  const text = await response.text()
-  
-  // Parse Prometheus metrics (simplified)
-  const lines = text.split('\n')
-  const jobsTotal = lines.find(line => line.startsWith('jobs_total'))?.split(' ')[1] || '0'
-  const jobsSuccess = lines.find(line => line.startsWith('jobs_success_total'))?.split(' ')[1] || '0'
-  
-  return {
-    jobs_today: parseInt(jobsTotal),
-    success_rate: jobsTotal === '0' ? 0 : (parseInt(jobsSuccess) / parseInt(jobsTotal)) * 100,
-    avg_processing_time: 0,
-    vlm_usage_rate: 0,
-    top_errors: [],
-  }
-}
+export const apiClient = new ApiClient()
+export default apiClient

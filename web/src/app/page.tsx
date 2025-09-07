@@ -1,10 +1,11 @@
-import { Hero, HowItWorks } from '@/components/hero'
+import { Hero } from '@/components/hero'
+import { WorkflowSection } from '@/components/workflow-section'
 
 export default function HomePage() {
   return (
     <>
       <Hero />
-      <HowItWorks />
+      <WorkflowSection />
     </>
   )
 }

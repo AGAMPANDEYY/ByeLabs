@@ -9,6 +9,7 @@ import structlog
 from typing import Dict, Any, List
 from .agents.intake_email import run as intake_email_run
 from .agents.classifier import run as classifier_run
+from .agents.llm_extractor import run as llm_extractor_run
 from .agents.extract_rule import run as extract_rule_run
 from .agents.extract_pdf import run as extract_pdf_run
 from .agents.normalizer import run as normalizer_run
@@ -37,6 +38,9 @@ def process_job_simple(job_id: int) -> Dict[str, Any]:
         "needs_vlm": False,
         "vlm_used": False,
         "force_vlm_toggle": False,
+        "llm_used": False,
+        "llm_error": None,
+        "extraction_method": "unknown",
         "issues": [],
         "status": "processing",
         "processing_notes": [],
@@ -59,15 +63,49 @@ def process_job_simple(job_id: int) -> Dict[str, Any]:
         if state.get("error"):
             raise Exception(f"Classification failed: {state['error']}")
         
-        # Step 3: Extract Data (Rule-based)
-        logger.info("Step 3: Extract Data (Rule-based)", job_id=job_id)
-        state = extract_rule_run(state)
-        if state.get("error"):
-            raise Exception(f"Rule extraction failed: {state['error']}")
+        # Step 3: Extract Data (LLM-first with fallback)
+        logger.info("Step 3: Extract Data (LLM-first)", job_id=job_id)
         
-        # Copy extracted_data to rows for versioner
-        if "extracted_data" in state:
-            state["rows"] = state["extracted_data"]
+        # Check if SLM is enabled and available
+        from .config import get_settings
+        settings = get_settings()
+        
+        if settings.slm_enabled:
+            # Try LLM extraction first
+            state = llm_extractor_run(state)
+            
+            if state.get("llm_used", False) and not state.get("llm_error"):
+                # LLM extraction successful
+                logger.info("SLM extraction successful, using SLM results", job_id=job_id)
+                if "extracted_data" in state:
+                    state["rows"] = state["extracted_data"]
+            else:
+                # LLM failed, fallback to rule-based extraction
+                logger.warning("SLM extraction failed, falling back to rule-based extraction", 
+                             job_id=job_id, llm_error=state.get("llm_error"))
+                
+                # Clear any LLM errors from state
+                state.pop("llm_error", None)
+                state["llm_used"] = False
+                
+                # Run rule-based extraction
+                state = extract_rule_run(state)
+                if state.get("error"):
+                    raise Exception(f"Rule extraction failed: {state['error']}")
+                
+                # Copy extracted_data to rows for versioner
+                if "extracted_data" in state:
+                    state["rows"] = state["extracted_data"]
+        else:
+            # SLM is disabled, use rule-based extraction directly
+            logger.info("SLM is disabled, using rule-based extraction", job_id=job_id)
+            state = extract_rule_run(state)
+            if state.get("error"):
+                raise Exception(f"Rule extraction failed: {state['error']}")
+            
+            # Copy extracted_data to rows for versioner
+            if "extracted_data" in state:
+                state["rows"] = state["extracted_data"]
         
         # Step 4: Extract PDF (if needed)
         if state.get("route_map", {}).get("type") in ["PDF_NATIVE", "PDF_SCANNED"]:
@@ -118,7 +156,9 @@ def process_job_simple(job_id: int) -> Dict[str, Any]:
                    processing_time=processing_time,
                    rows_count=len(state.get("rows", [])),
                    issues_count=len(state.get("issues", [])),
-                   version_id=state.get("version_id"))
+                   version_id=state.get("version_id"),
+                   llm_used=state.get("llm_used", False),
+                   extraction_method=state.get("extraction_method", "unknown"))
         
         return {
             "job_id": job_id,
@@ -127,6 +167,8 @@ def process_job_simple(job_id: int) -> Dict[str, Any]:
             "rows_processed": len(state.get("rows", [])),
             "issues_found": len(state.get("issues", [])),
             "vlm_used": state.get("vlm_used", False),
+            "llm_used": state.get("llm_used", False),
+            "extraction_method": state.get("extraction_method", "unknown"),
             "processing_notes": state.get("processing_notes", []),
             "processing_time": processing_time
         }

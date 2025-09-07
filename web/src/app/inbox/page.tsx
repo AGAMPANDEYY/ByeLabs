@@ -303,7 +303,7 @@ export default function InboxPage() {
                           </Button>
                         </Link>
                         
-                        {['completed', 'needs_review'].includes(job.status) && (
+                        {['completed', 'needs_review', 'ready'].includes(job.status) && (
                           <Button 
                             variant="ghost" 
                             size="sm" 
@@ -318,9 +318,9 @@ export default function InboxPage() {
                           variant="ghost"
                           size="sm"
                           onClick={() => handleDownloadExcel(job.id)}
-                          disabled={!['completed', 'needs_review'].includes(job.status) || downloading.has(job.id)}
-                          title={['completed', 'needs_review'].includes(job.status) ? "Download Excel" : "Processing - Download will be available when complete"}
-                          className={['completed', 'needs_review'].includes(job.status) ? 'text-blue-600 hover:text-blue-700' : 'text-gray-400'}
+                          disabled={!['completed', 'needs_review', 'ready'].includes(job.status) || downloading.has(job.id)}
+                          title={['completed', 'needs_review', 'ready'].includes(job.status) ? "Download Excel" : "Processing - Download will be available when complete"}
+                          className={['completed', 'needs_review', 'ready'].includes(job.status) ? 'text-blue-600 hover:text-blue-700' : 'text-gray-400'}
                         >
                           {downloading.has(job.id) ? (
                             <RefreshCw className="w-4 h-4 animate-spin" />

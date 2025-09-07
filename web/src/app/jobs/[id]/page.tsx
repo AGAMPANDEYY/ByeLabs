@@ -79,6 +79,7 @@ export default function JobDetailPage() {
         description: 'Generate Excel file with standardized format',
         status: job?.status === 'completed' ? 'completed' : 
                 job?.status === 'needs_review' ? 'completed' :
+                job?.status === 'ready' ? 'completed' :
                 job?.status === 'error' ? 'error' : 'pending'
       }
     ]
@@ -342,6 +343,22 @@ export default function JobDetailPage() {
                 >
                   <Play className="w-4 h-4 mr-2" />
                   Retry Processing
+                </Button>
+              )}
+              
+              {['completed', 'needs_review', 'ready'].includes(job.status) && (
+                <Button
+                  onClick={handleExport}
+                  disabled={exporting}
+                  className="w-full"
+                  variant="default"
+                >
+                  {exporting ? (
+                    <RefreshCw className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Download className="w-4 h-4 mr-2" />
+                  )}
+                  {exporting ? 'Exporting...' : 'Download Excel'}
                 </Button>
               )}
               

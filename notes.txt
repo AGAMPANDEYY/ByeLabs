@@ -72,10 +72,6 @@ docker logs -f <container_name>
 # View logs since specific time
 docker logs --since 10m <container_name>
 
-
-
-
-
 # Stop all running containers
 docker compose -f docker-compose.simple.yml down
 
@@ -87,7 +83,7 @@ docker image prune -f
 
 #USE WITHOUT VLMS 
 
-docker compose -f docker-compose.simple.yml up -d --build db mq minio mailpit api worker
+docker compose -f docker-compose.simple.yml up -d --build 
 
 #TEST
 

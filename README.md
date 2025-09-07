@@ -28,6 +28,112 @@
 <img width="3768" height="1680" alt="image" src="https://github.com/user-attachments/assets/5f71758e-8f08-4c67-8e21-5042c761cf2e" />
 
 
+## Quick Start Guide
+
+### Prerequisites
+- Docker and Docker Compose installed
+- Python 3.11+ (for local development)
+- Node.js 18+ (for frontend development)
+- Git
+
+### 1. Clone and Setup
+
+```bash
+git clone https://github.com/AGAMPANDEYY/ByeLabs.git
+cd ByeLabs
+```
+
+### 2. Start Backend Services (Docker)
+
+```bash
+docker-compose -f docker-compose.simple.yml up -d
+```
+
+### 3. Start Frontend (Local)
+
+```bash
+cd web
+npm install
+npm run dev
+```
+
+### 4. Setup LLM Service (Optional)
+```bash
+# Download model
+
+mkdir -p models
+cd models
+wget https://huggingface.co/P3g4su5/ByeLabs-LoRA/resolve/main/adapter.gguf
+
+# Start llama.cpp server
+cd ..
+docker run -d --name llama-server -p 5000:8080 -v $(pwd)/models:/models ghcr.io/ggerganov/llama.cpp:server -m /models/adapter.gguf --host 0.0.0.0 --port 8080
+```
+
+### 5. Test the System
+```bash
+# Test API health
+curl http://localhost:8000/health
+
+# Upload test email
+curl -X POST -F "file=@test_email.eml" http://localhost:8000/ingest
+
+# Check job status
+curl http://localhost:8000/jobs/1
+
+# Download Excel export
+curl -O http://localhost:8000/exports/1/download
+```
+
+### 6. Access Web Interface
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
+- Llama cpp : port 5000
+
+### 7. Monitor Logs
+```bash
+# Backend logs
+docker-compose -f docker-compose.simple.yml logs -f api
+
+# Worker logs
+docker-compose -f docker-compose.simple.yml logs -f worker
+
+# All services
+docker-compose -f docker-compose.simple.yml logs -f
+```
+
+### 8. Stop Services
+```bash
+# Stop all services
+docker-compose -f docker-compose.simple.yml down
+
+# Stop and remove volumes
+docker-compose -f docker-compose.simple.yml down -v
+```
+
+### 10. Troubleshooting
+```bash
+# Check container status
+docker ps
+
+# Restart specific service
+docker-compose -f docker-compose.simple.yml restart api
+
+# View container logs
+docker logs byelabs-api-1
+
+# Clean up Docker
+docker system prune -a
+```
+
+### System Architecture
+- **Backend**: FastAPI + PostgreSQL + MinIO + RabbitMQ + Celery
+- **Frontend**: Next.js 14 + TypeScript + Tailwind CSS
+- **LLM**: Local llama.cpp server with Qwen 3.4B model
+- **Processing**: Multi-agent pipeline with spaCy NLP + LLM extraction
+- **Storage**: MinIO for files, PostgreSQL for metadata
+- **Queue**: RabbitMQ + Celery for async processing
 
 ---
 

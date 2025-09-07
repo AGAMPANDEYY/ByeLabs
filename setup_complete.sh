@@ -103,7 +103,7 @@ main() {
     
     print_success "All prerequisites are installed!"
     
-    # Step 1: Install HuggingFace CLI
+    # Step 1: Install HuggingFace CLI (if not in Docker)
     print_status "Installing HuggingFace CLI..."
     if ! command_exists huggingface-cli; then
         pip install huggingface_hub[cli]

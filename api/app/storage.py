@@ -60,8 +60,11 @@ class StorageClient:
             else:
                 logger.debug(f"Bucket exists: {self.bucket_name}")
         except S3Error as e:
-            logger.error(f"Failed to create bucket {self.bucket_name}: {e}")
-            raise StorageError(f"Failed to create bucket: {e}")
+            if "BucketAlreadyOwnedByYou" in str(e):
+                logger.info(f"Bucket {self.bucket_name} already exists and is owned by us")
+            else:
+                logger.error(f"Failed to create bucket {self.bucket_name}: {e}")
+                raise StorageError(f"Failed to create bucket: {e}")
         except Exception as e:
             logger.error(f"Unexpected error creating bucket: {e}")
             raise StorageError(f"Unexpected error: {e}")

@@ -22,9 +22,12 @@ services:
     environment:
       RABBITMQ_DEFAULT_USER: guest
       RABBITMQ_DEFAULT_PASS: guest
+      RABBITMQ_ERLANG_COOKIE: SWQOKODSQALRPCLNMEQG
     ports:
       - "5672:5672"    # AMQP port
       - "15672:15672"  # Management UI
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
@@ -135,11 +138,10 @@ services:
     ports:
       - "5000:5000"
     command: 
-      -hf unsloth/Qwen3-4B-Instruct-2507-GGUF
-      --lora /models/adapter.gguf
+      -m /models/adapter.gguf
       --host 0.0.0.0
       --port 5000
-      - --api-only
+      --n-gpu-layers 0
     volumes:
       - ./models:/models
       
@@ -152,3 +154,4 @@ services:
 volumes:
   postgres_data:
   minio_data:
+  rabbitmq_data:

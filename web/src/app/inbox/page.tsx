@@ -7,6 +7,7 @@ import { useJobs } from '@/hooks/useJobs'
 import { FileUpload } from '@/components/file-upload'
 import { formatDate } from '@/lib/utils'
 import { apiClient } from '@/lib/api'
+import * as XLSX from 'xlsx'
 import { 
   Eye, 
   Play, 
@@ -68,70 +69,35 @@ export default function InboxPage() {
         const exportData = jobDetails.artifacts.exports[0]
         const blob = await apiClient.downloadExport(exportData.id)
         
-        // For now, create mock preview data - in real implementation, you'd parse the Excel
-        const mockData = {
-          headers: [
-            'Transaction Type',
-            'Transaction Attribute', 
-            'Effective Date',
-            'Term Date',
-            'Term Reason',
-            'Provider Name',
-            'Provider NPI',
-            'Provider Specialty',
-            'State License',
-            'Organization Name',
-            'TIN',
-            'Group NPI',
-            'Complete Address',
-            'Phone Number',
-            'Fax Number',
-            'PPG ID',
-            'Line Of Business'
-          ],
-          rows: [
-            {
-              'Transaction Type': 'Term',
-              'Transaction Attribute': 'Provider Termination',
-              'Effective Date': '2024-01-01',
-              'Term Date': '2024-01-31',
-              'Term Reason': 'Voluntary',
-              'Provider Name': 'John Smith',
-              'Provider NPI': '1234567890',
-              'Provider Specialty': 'Internal Medicine',
-              'State License': 'MD123456',
-              'Organization Name': 'RCHN & RCSSD',
-              'TIN': '12-3456789',
-              'Group NPI': '0987654321',
-              'Complete Address': '123 Main St, City, State 12345',
-              'Phone Number': '(555) 123-4567',
-              'Fax Number': '(555) 123-4568',
-              'PPG ID': 'PPG001',
-              'Line Of Business': 'Commercial'
-            },
-            {
-              'Transaction Type': 'Add',
-              'Transaction Attribute': 'New Provider',
-              'Effective Date': '2024-02-01',
-              'Term Date': '-',
-              'Term Reason': '-',
-              'Provider Name': 'Jane Doe',
-              'Provider NPI': '0987654321',
-              'Provider Specialty': 'Family Medicine',
-              'State License': 'MD789012',
-              'Organization Name': 'RCHN & RCSSD',
-              'TIN': '12-3456789',
-              'Group NPI': '0987654321',
-              'Complete Address': '456 Oak Ave, City, State 12345',
-              'Phone Number': '(555) 987-6543',
-              'Fax Number': '(555) 987-6544',
-              'PPG ID': 'PPG002',
-              'Line Of Business': 'Medicaid'
-            }
-          ]
-        }
+        // Parse the actual Excel data from the backend pipeline
+        const arrayBuffer = await blob.arrayBuffer()
+        const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+        const sheetName = workbook.SheetNames[0] // Get first sheet
+        const worksheet = workbook.Sheets[sheetName]
         
-        setPreviewData(mockData)
+        // Convert to JSON
+        const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+        
+        if (jsonData.length > 0) {
+          const headers = jsonData[0] as string[]
+          const rows = jsonData.slice(1).map((row: unknown) => {
+            const rowArray = row as any[]
+            const rowData: any = {}
+            headers.forEach((header, index) => {
+              rowData[header] = rowArray[index] || null
+            })
+            return rowData
+          }).filter(row => Object.values(row).some(value => value !== null && value !== ''))
+          
+          const realData = {
+            headers,
+            rows
+          }
+          
+          setPreviewData(realData)
+        } else {
+          setPreviewData(null)
+        }
       } else {
         setPreviewData(null)
       }

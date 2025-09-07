@@ -74,6 +74,13 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
             })
             return state
         
+        # Debug: Log the actual record data
+        logger.info("Records retrieved for Excel export", 
+                   job_id=job_id, 
+                   version_id=version_id,
+                   record_count=len(records),
+                   sample_record=records[0] if records else None)
+        
         # Create Excel file
         excel_bytes = _create_excel_file(job_id, version_id, records)
         
@@ -128,6 +135,14 @@ def _create_excel_file(job_id: int, version_id: int, records: List[Dict[str, Any
         for field in EXCEL_SCHEMA:
             row_data[field] = record["data"].get(field, "")
         df_data.append(row_data)
+    
+    # Debug: Log the DataFrame data
+    logger.info("Excel DataFrame created", 
+               job_id=job_id,
+               version_id=version_id,
+               df_rows=len(df_data),
+               sample_row=df_data[0] if df_data else None,
+               schema_fields=EXCEL_SCHEMA)
     
     df = pd.DataFrame(df_data, columns=EXCEL_SCHEMA)
     

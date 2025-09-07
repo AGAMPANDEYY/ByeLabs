@@ -122,7 +122,7 @@ function Main {
     
     Write-Success "All prerequisites are installed!"
     
-    # Step 1: Install HuggingFace CLI
+    # Step 1: Install HuggingFace CLI (if not in Docker)
     Write-Status "Installing HuggingFace CLI..."
     if (-not (Test-Command "huggingface-cli")) {
         pip install huggingface_hub[cli]

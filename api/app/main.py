@@ -775,6 +775,19 @@ async def get_job_details(
                 "record_count": db.query(Record).filter(Record.version_id == version.id).count()
             })
         
+        # Calculate total and processed records
+        total_records = 0
+        processed_records = 0
+        
+        if job.current_version_id:
+            # Get total records from current version
+            total_records = db.query(Record).filter(Record.version_id == job.current_version_id).count()
+            
+            # Get processed records (records that passed validation)
+            # For now, we'll consider all records as "processed" if they exist
+            # In the future, we could add a validation status field to records
+            processed_records = total_records
+        
         return {
             "id": job.id,
             "status": job.status,
@@ -784,7 +797,10 @@ async def get_job_details(
             "current_version": current_version_info,
             "issues_summary": issues_summary,
             "artifacts": artifacts,
-            "versions": versions
+            "versions": versions,
+            "total_records": total_records,
+            "processed_records": processed_records,
+            "issues_count": sum(issues_summary.values())
         }
         
     except HTTPException:

@@ -128,8 +128,8 @@ class Settings(BaseSettings):
     # TRAINED SLM CONFIGURATION
     # =============================================================================
     slm_enabled: bool = Field(default=True, env="SLM_ENABLED", description="Enable trained SLM for data extraction")
-    slm_base_url: str = Field(default="http://localhost:5000/v1", env="SLM_BASE_URL", description="SLM service base URL")
-    slm_model_name: str = Field(default="gpt-4.1", env="SLM_MODEL_NAME", description="SLM model name")
+    slm_base_url: str = Field(default="http://llm:5000/v1", env="SLM_BASE_URL", description="SLM service base URL")
+    slm_model_name: str = Field(default="/root/.cache/llama.cpp/unsloth_Qwen3-4B-Instruct-2507-GGUF_Qwen3-4B-Instruct-2507-Q4_K_M.gguf", env="SLM_MODEL_NAME", description="SLM model name")
     slm_api_key: str = Field(default="dummy-key", env="SLM_API_KEY", description="SLM API key (not needed for local)")
     slm_timeout: int = Field(default=30, env="SLM_TIMEOUT", description="SLM request timeout in seconds")
     slm_max_tokens: int = Field(default=4000, env="SLM_MAX_TOKENS", description="Maximum tokens for SLM generation")
@@ -213,3 +213,7 @@ class Settings(BaseSettings):
 
 # Global settings instance
 settings = Settings()
+
+def get_settings() -> Settings:
+    """Get the global settings instance."""
+    return settings

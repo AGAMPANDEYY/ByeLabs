@@ -23,25 +23,25 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# Excel Schema - 17 fields for roster data
+# Excel Schema - 17 fields for roster data (matching exporter_excel.py)
 EXCEL_SCHEMA = [
-    "NPI",
-    "Provider Name",
-    "Specialty",
-    "Phone",
-    "Email", 
-    "Address",
-    "City",
-    "State",
-    "ZIP",
-    "DOB",
-    "Gender",
+    "Transaction Type",
+    "Transaction Attribute", 
     "Effective Date",
     "Term Date",
-    "Status",
-    "Network",
-    "Tier",
-    "Notes"
+    "Term Reason",
+    "Provider Name",
+    "Provider NPI",
+    "Provider Specialty",
+    "State License",
+    "Organization Name",
+    "TIN",
+    "Group NPI",
+    "Complete Address",
+    "Phone Number",
+    "Fax Number",
+    "PPG ID",
+    "Line Of Business"
 ]
 
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
@@ -189,16 +189,14 @@ def _normalize_row_data(original_data: Dict[str, Any], row_idx: int, header_mapp
                 value = original_data[source_field]
                 if value and str(value).strip():
                     # Apply field-specific normalization
-                    if target_field == "NPI":
+                    if target_field == "Provider NPI":
                         normalized_value, delta = _normalize_npi(str(value))
-                    elif target_field == "Phone":
+                    elif target_field == "Phone Number":
                         normalized_value, delta = _normalize_phone(str(value))
-                    elif target_field in ["DOB", "Effective Date", "Term Date"]:
+                    elif target_field in ["Effective Date", "Term Date"]:
                         normalized_value, delta = _normalize_date(str(value))
-                    elif target_field == "Address":
+                    elif target_field == "Complete Address":
                         normalized_value, delta = _normalize_address(str(value))
-                    elif target_field == "Email":
-                        normalized_value, delta = _normalize_email(str(value))
                     elif target_field == "Provider Name":
                         normalized_value, delta = _normalize_name(str(value))
                     else:
@@ -217,18 +215,17 @@ def _normalize_row_data(original_data: Dict[str, Any], row_idx: int, header_mapp
     # Map and normalize each field (fallback for unmapped fields)
     for field in EXCEL_SCHEMA:
         if not normalized_data[field]:  # Only process if not already mapped by LLM
-            original_value = original_data.get(field, "").strip()
+            # Try to get value from original data, with field name mapping
+            original_value = _get_mapped_value(original_data, field)
             
-            if field == "NPI":
+            if field == "Provider NPI":
                 normalized_value, delta = _normalize_npi(original_value)
-            elif field == "Phone":
+            elif field == "Phone Number":
                 normalized_value, delta = _normalize_phone(original_value)
-            elif field in ["DOB", "Effective Date", "Term Date"]:
+            elif field in ["Effective Date", "Term Date"]:
                 normalized_value, delta = _normalize_date(original_value)
-            elif field == "Address":
+            elif field == "Complete Address":
                 normalized_value, delta = _normalize_address(original_value)
-            elif field == "Email":
-                normalized_value, delta = _normalize_email(original_value)
             elif field == "Provider Name":
                 normalized_value, delta = _normalize_name(original_value)
             else:
@@ -246,6 +243,39 @@ def _normalize_row_data(original_data: Dict[str, Any], row_idx: int, header_mapp
                 deltas.append(delta)
     
     return normalized_data, deltas
+
+def _get_mapped_value(original_data: Dict[str, Any], target_field: str) -> str:
+    """
+    Get value from original data, mapping old field names to new 17-column schema.
+    """
+    # Direct mapping first
+    if target_field in original_data:
+        return str(original_data[target_field]).strip()
+    
+    # Field name mapping for backward compatibility
+    field_mapping = {
+        "Provider NPI": ["NPI", "Provider NPI"],
+        "Provider Specialty": ["Specialty", "Provider Specialty"],
+        "Phone Number": ["Phone", "Phone Number"],
+        "Complete Address": ["Address", "Complete Address"],
+        "State License": ["License", "State License"],
+        "Organization Name": ["Organization", "Organization Name"],
+        "Group NPI": ["Group NPI"],
+        "Fax Number": ["Fax", "Fax Number"],
+        "PPG ID": ["PPG", "PPG ID"],
+        "Line Of Business": ["LOB", "Line of Business", "Line Of Business"],
+        "Transaction Type": ["Type", "Transaction Type"],
+        "Transaction Attribute": ["Attribute", "Transaction Attribute"],
+        "Term Reason": ["Reason", "Term Reason"]
+    }
+    
+    # Try mapped field names
+    if target_field in field_mapping:
+        for old_field in field_mapping[target_field]:
+            if old_field in original_data:
+                return str(original_data[old_field]).strip()
+    
+    return ""
 
 def _normalize_npi(npi: str) -> Tuple[str, Optional[Dict[str, Any]]]:
     """Normalize NPI: digits only; Luhn with 80840 prefix; store validity flag."""

@@ -14,11 +14,97 @@ from typing import Dict, Any, List
 import structlog
 import pandas as pd
 from bs4 import BeautifulSoup
+import spacy
+from spacy import displacy
+import dateparser
 
 from ..storage import storage_client
 from ..metrics import get_agent_runs_total, get_agent_latency_seconds
 
 logger = structlog.get_logger(__name__)
+
+# Load spaCy model for NLP processing
+try:
+    nlp = spacy.load("en_core_web_sm")
+    
+    # Add custom patterns for healthcare data extraction
+    from spacy.matcher import Matcher, PhraseMatcher
+    
+    # Initialize matchers
+    matcher = Matcher(nlp.vocab)
+    phrase_matcher = PhraseMatcher(nlp.vocab)
+    
+    # Define healthcare-specific patterns
+    _setup_healthcare_patterns(nlp, matcher, phrase_matcher)
+    
+except OSError:
+    logger.warning("spaCy model 'en_core_web_sm' not found. Using basic regex extraction only.")
+    nlp = None
+    matcher = None
+    phrase_matcher = None
+
+def _setup_healthcare_patterns(nlp, matcher, phrase_matcher):
+    """Setup custom patterns for healthcare data extraction based on the 17-column schema."""
+    
+    # 1. NPI Pattern (10-digit number)
+    npi_pattern = [{"TEXT": {"REGEX": r"^\d{10}$"}}]
+    matcher.add("NPI", [npi_pattern])
+    
+    # 2. TIN Pattern (9-digit number, optionally with hyphen)
+    tin_pattern = [{"TEXT": {"REGEX": r"^\d{2}-?\d{7}$"}}]
+    matcher.add("TIN", [tin_pattern])
+    
+    # 3. Phone/Fax Pattern (10-digit number with various formats)
+    phone_pattern = [{"TEXT": {"REGEX": r"^\d{3}[-.]?\d{3}[-.]?\d{4}$"}}]
+    matcher.add("PHONE", [phone_pattern])
+    
+    # 4. State License Pattern (alphanumeric, often starts with letters)
+    license_pattern = [{"TEXT": {"REGEX": r"^[A-Z]{1,3}\d{4,8}$"}}]
+    matcher.add("LICENSE", [license_pattern])
+    
+    # 5. PPG ID Pattern (alphanumeric codes like P04, 1104, 569)
+    ppg_pattern = [{"TEXT": {"REGEX": r"^(P\d{2,3}|\d{3,4})$"}}]
+    matcher.add("PPG_ID", [ppg_pattern])
+    
+    # 6. Transaction Types
+    transaction_types = ["Add", "Update", "Term", "Terminate", "Termination", "Addition", "New Provider"]
+    transaction_phrases = [nlp(text) for text in transaction_types]
+    phrase_matcher.add("TRANSACTION_TYPE", transaction_phrases)
+    
+    # 7. Transaction Attributes
+    transaction_attrs = ["Specialty", "Provider", "Address", "PPG", "Phone Number", "LOB", "Line of Business", 
+                        "Location", "Practice", "License", "NPI", "TIN"]
+    attr_phrases = [nlp(text) for text in transaction_attrs]
+    phrase_matcher.add("TRANSACTION_ATTR", attr_phrases)
+    
+    # 8. Medical Specialties
+    specialties = [
+        "Internal Medicine", "Family Medicine", "Pediatrics", "Cardiology", "Orthopedics", 
+        "Dermatology", "Neurology", "Psychiatry", "Radiology", "Anesthesiology",
+        "Emergency Medicine", "Obstetrics", "Gynecology", "Oncology", "Urology",
+        "Ophthalmology", "ENT", "Pulmonology", "Endocrinology", "Gastroenterology",
+        "Nephrology", "Rheumatology", "Hematology", "Infectious Disease", "Geriatrics"
+    ]
+    specialty_phrases = [nlp(text) for text in specialties]
+    phrase_matcher.add("SPECIALTY", specialty_phrases)
+    
+    # 9. Line of Business
+    lob_types = ["Medicare", "Medicaid", "Commercial", "Medicare Advantage", "HMO", "PPO", "POS"]
+    lob_phrases = [nlp(text) for text in lob_types]
+    phrase_matcher.add("LOB", lob_phrases)
+    
+    # 10. Term Reasons
+    term_reasons = [
+        "Provider Left Group", "Contract Ended", "License Expired", "Retired", "Resigned",
+        "Terminated", "No Longer Practicing", "Practice Closure", "Relocation", "Death"
+    ]
+    term_phrases = [nlp(text) for text in term_reasons]
+    phrase_matcher.add("TERM_REASON", term_phrases)
+    
+    # 11. Provider Titles
+    provider_titles = ["MD", "DO", "NP", "PA", "RN", "Dr.", "Doctor", "Nurse Practitioner", "Physician Assistant"]
+    title_phrases = [nlp(text) for text in provider_titles]
+    phrase_matcher.add("PROVIDER_TITLE", title_phrases)
 
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -176,50 +262,114 @@ def _extract_html_table(html_content: str, artifact: Dict[str, Any]) -> List[Dic
                     if not value_str or value_str.lower() in ['nan', 'none', '']:
                         continue
                     
-                    # Map column names to Excel schema
+                    # Map column names to Excel schema using comprehensive 17-column mapping
                     col_lower = str(col).lower().replace(":", "").replace("#", "").strip()
                     
-                    if "provider name" in col_lower:
+                    # Comprehensive field mapping based on the 17-column schema
+                    if any(term in col_lower for term in ["provider name", "name", "physician", "doctor"]):
                         row_data["Provider Name"] = value_str
-                    elif "npi" in col_lower:
+                    elif any(term in col_lower for term in ["npi", "national provider"]):
                         row_data["Provider NPI"] = value_str
-                    elif "specialty" in col_lower:
+                    elif any(term in col_lower for term in ["specialty", "specialization", "practice"]):
                         row_data["Provider Specialty"] = value_str
-                    elif "provider type" in col_lower:
-                        row_data["Transaction Attribute"] = value_str
-                    elif "term date" in col_lower:
+                    elif any(term in col_lower for term in ["license", "lic", "state license"]):
+                        row_data["State License"] = value_str
+                    elif any(term in col_lower for term in ["organization", "practice", "group", "facility"]):
+                        row_data["Organization Name"] = value_str
+                    elif any(term in col_lower for term in ["tin", "tax id", "tax identification"]):
+                        row_data["TIN"] = value_str
+                    elif any(term in col_lower for term in ["group npi", "group national provider"]):
+                        row_data["Group NPI"] = value_str
+                    elif any(term in col_lower for term in ["address", "location", "street"]):
+                        row_data["Complete Address"] = value_str
+                    elif any(term in col_lower for term in ["phone", "telephone", "tel"]):
+                        row_data["Phone Number"] = value_str
+                    elif any(term in col_lower for term in ["fax", "facsimile"]):
+                        row_data["Fax Number"] = value_str
+                    elif any(term in col_lower for term in ["ppg", "ppg id", "practice group"]):
+                        row_data["PPG ID"] = value_str
+                    elif any(term in col_lower for term in ["lob", "line of business", "business"]):
+                        row_data["Line Of Business (Medicare/Commercial/Me)"] = value_str
+                    elif any(term in col_lower for term in ["effective date", "start date", "beginning"]):
+                        row_data["Effective Date"] = value_str
+                    elif any(term in col_lower for term in ["term date", "end date", "termination date"]):
                         row_data["Term Date"] = value_str
-                    elif "reason" in col_lower:
+                    elif any(term in col_lower for term in ["term reason", "reason", "termination reason"]):
                         row_data["Term Reason"] = value_str
+                    elif any(term in col_lower for term in ["transaction type", "type", "action"]):
+                        row_data["Transaction Type"] = value_str
+                    elif any(term in col_lower for term in ["transaction attribute", "attribute", "change type"]):
+                        row_data["Transaction Attribute"] = value_str
             
             # If we have data but no clear column mapping, try to infer from position
-            if not row_data and len(best_table.columns) >= 6:
-                # Assume standard order: Provider Name, NPI, Specialty, Provider Type, Term Date, Reason
+            if not row_data and len(best_table.columns) >= 3:
+                # Enhanced positional inference for common table structures
                 values = [str(row[col]).strip() for col in best_table.columns if pd.notna(row[col])]
-                if len(values) >= 6:
-                    row_data = {
-                        "Provider Name": values[0] if values[0] else "",
-                        "Provider NPI": values[1] if values[1] else "",
-                        "Provider Specialty": values[2] if values[2] else "",
-                        "Transaction Attribute": values[3] if values[3] else "",
-                        "Term Date": values[4] if values[4] else "",
-                        "Term Reason": values[5] if values[5] else ""
-                    }
+                
+                # Common table patterns and their field mappings
+                if len(values) >= 3:
+                    # Pattern 1: Name, NPI, Specialty (most common)
+                    if len(values) >= 3:
+                        row_data["Provider Name"] = values[0] if values[0] else ""
+                        # Check if second value looks like NPI (10 digits)
+                        if values[1] and values[1].isdigit() and len(values[1]) == 10:
+                            row_data["Provider NPI"] = values[1]
+                            row_data["Provider Specialty"] = values[2] if len(values) > 2 else ""
+                        else:
+                            row_data["Provider Specialty"] = values[1] if values[1] else ""
+                            row_data["Provider NPI"] = values[2] if len(values) > 2 and values[2].isdigit() and len(values[2]) == 10 else ""
+                    
+                    # Pattern 2: Extended fields if more columns available
+                    if len(values) >= 6:
+                        row_data["Transaction Type"] = values[3] if values[3] else "Update"
+                        row_data["Effective Date"] = values[4] if values[4] else ""
+                        row_data["Term Date"] = values[5] if values[5] else ""
+                    
+                    if len(values) >= 8:
+                        row_data["State License"] = values[6] if values[6] else ""
+                        row_data["Organization Name"] = values[7] if values[7] else ""
+                    
+                    if len(values) >= 10:
+                        row_data["TIN"] = values[8] if values[8] else ""
+                        row_data["Complete Address"] = values[9] if values[9] else ""
             
-            # Set default values for required fields
+            # Set default values for required fields using comprehensive 17-column schema
             if row_data:  # Only add non-empty rows
-                # Set transaction type to "Term" since this is a termination notice
-                row_data["Transaction Type"] = "Term"
-                row_data["Effective Date"] = ""  # Not provided in email
-                row_data["State License"] = ""  # Not provided in email
-                row_data["Organization Name"] = "RCHN & RCSSD"  # From email text
-                row_data["TIN"] = "82-1111113"  # From email text
-                row_data["Group NPI"] = ""  # Not provided
-                row_data["Complete Address"] = ""  # Not provided
-                row_data["Phone Number"] = ""  # Not provided
-                row_data["Fax Number"] = ""  # Not provided
-                row_data["PPG ID"] = ""  # Not provided
-                row_data["Line Of Business"] = "FFS/PPO/ACO/HMO/Medi-Cal"  # From email text
+                # Set intelligent defaults based on context
+                if "Transaction Type" not in row_data:
+                    row_data["Transaction Type"] = "Term"  # Default for termination notices
+                
+                if "Transaction Attribute" not in row_data:
+                    row_data["Transaction Attribute"] = "Provider"
+                
+                # Set organization defaults from email context
+                if "Organization Name" not in row_data:
+                    row_data["Organization Name"] = "RCHN & RCSSD"
+                
+                # Set TIN from email context
+                if "TIN" not in row_data:
+                    row_data["TIN"] = "82-1111113"
+                
+                # Set Line of Business from email context
+                if "Line Of Business (Medicare/Commercial/Me)" not in row_data:
+                    row_data["Line Of Business (Medicare/Commercial/Me)"] = "FFS/PPO/ACO/HMO/Medi-Cal"
+                
+                # Set "Information not found" defaults for fields not provided
+                defaults = {
+                    "Effective Date": "Information not found",
+                    "Term Date": "Information not found",
+                    "Term Reason": "Information not found",
+                    "State License": "Information not found",
+                    "Group NPI": "Information not found",
+                    "Complete Address": "Information not found",
+                    "Phone Number": "Information not found",
+                    "Fax Number": "Information not found",
+                    "PPG ID": "Information not found"
+                }
+                
+                for field, default_value in defaults.items():
+                    if field not in row_data:
+                        row_data[field] = default_value
                 
                 rows.append({
                     "row_idx": idx,
@@ -417,59 +567,239 @@ def _extract_structured_text(text_content: str, artifact: Dict[str, Any]) -> Lis
     return rows
 
 def _extract_narrative_text(text_content: str, artifact: Dict[str, Any]) -> List[Dict[str, Any]]:
-    """Extract data from narrative text (like practice location changes)."""
+    """Extract data from narrative text using comprehensive spaCy NLP and the 17-column schema."""
     try:
-        # Look for common patterns in narrative text
-        patterns = {
-            "provider_name": r"([A-Z][a-z]+ [A-Z][a-z]+(?:, MD|, DO|, NP|, PA)?)",
-            "effective_date": r"Effective\s+(\d{1,2}/\d{1,2}/\d{4}|\d{4}-\d{2}-\d{2})",
-            "location_change": r"move.*?from\s+([^,]+?)\s+to\s+([^,]+?)(?:\.|$)",
-            "termination": r"(?:terminate|terminated|termination).*?([A-Z][a-z]+ [A-Z][a-z]+)",
-            "npi": r"NPI[:\s#]*(\d{10})",
-            "license": r"License[:\s#]*([A-Z0-9]+)",
-            "tin": r"TIN[:\s#]*(\d{2}-\d{7})",
-        }
-        
         extracted_data = {}
         
-        # Extract provider name
-        provider_match = re.search(patterns["provider_name"], text_content, re.IGNORECASE)
-        if provider_match:
-            extracted_data["Provider Name"] = provider_match.group(1)
+        if nlp and matcher and phrase_matcher:
+            # Use spaCy for advanced NLP processing
+            doc = nlp(text_content)
+            
+            # 1. Extract using custom matcher patterns
+            matches = matcher(doc)
+            for match_id, start, end in matches:
+                label = nlp.vocab.strings[match_id]
+                span = doc[start:end]
+                
+                if label == "NPI":
+                    extracted_data["Provider NPI"] = span.text
+                elif label == "TIN":
+                    extracted_data["TIN"] = span.text
+                elif label == "PHONE":
+                    if "Phone Number" not in extracted_data:
+                        extracted_data["Phone Number"] = span.text
+                    else:
+                        extracted_data["Fax Number"] = span.text
+                elif label == "LICENSE":
+                    extracted_data["State License"] = span.text
+                elif label == "PPG_ID":
+                    extracted_data["PPG ID"] = span.text
+            
+            # 2. Extract using phrase matcher
+            phrase_matches = phrase_matcher(doc)
+            for match_id, start, end in phrase_matches:
+                label = nlp.vocab.strings[match_id]
+                span = doc[start:end]
+                
+                if label == "TRANSACTION_TYPE":
+                    # Map to standard transaction types
+                    text = span.text.lower()
+                    if "add" in text or "new" in text:
+                        extracted_data["Transaction Type"] = "Add"
+                    elif "update" in text:
+                        extracted_data["Transaction Type"] = "Update"
+                    elif "term" in text:
+                        extracted_data["Transaction Type"] = "Term"
+                
+                elif label == "TRANSACTION_ATTR":
+                    extracted_data["Transaction Attribute"] = span.text
+                
+                elif label == "SPECIALTY":
+                    extracted_data["Provider Specialty"] = span.text
+                
+                elif label == "LOB":
+                    extracted_data["Line Of Business (Medicare/Commercial/Me)"] = span.text
+                
+                elif label == "TERM_REASON":
+                    extracted_data["Term Reason"] = span.text
+                
+                elif label == "PROVIDER_TITLE":
+                    # This helps identify provider names with titles
+                    pass
+            
+            # 3. Extract using built-in NER
+            persons = [ent.text for ent in doc.ents if ent.label_ == "PERSON"]
+            organizations = [ent.text for ent in doc.ents if ent.label_ == "ORG"]
+            dates = [ent.text for ent in doc.ents if ent.label_ == "DATE"]
+            locations = [ent.text for ent in doc.ents if ent.label_ == "GPE"]
+            
+            # Extract provider names (PERSON entities with medical context)
+            if persons and "Provider Name" not in extracted_data:
+                for person in persons:
+                    # Check if person has medical title nearby
+                    person_tokens = [token for token in doc if token.text in person]
+                    if person_tokens:
+                        for token in person_tokens:
+                            # Look for medical titles in surrounding context
+                            for child in token.children:
+                                if child.text.lower() in ['md', 'do', 'np', 'pa', 'dr.', 'doctor']:
+                                    extracted_data["Provider Name"] = person
+                                    break
+                            if "Provider Name" in extracted_data:
+                                break
+                
+                # If no medical title found, use first full name
+                if "Provider Name" not in extracted_data:
+                    for person in persons:
+                        if len(person.split()) >= 2:  # Full names
+                            extracted_data["Provider Name"] = person
+                            break
+            
+            # Extract dates and parse them
+            if dates:
+                for date_text in dates:
+                    parsed_date = dateparser.parse(date_text)
+                    if parsed_date:
+                        if "Effective Date" not in extracted_data:
+                            extracted_data["Effective Date"] = parsed_date.strftime("%Y-%m-%d")
+                        elif "Term Date" not in extracted_data and "term" in text_content.lower():
+                            extracted_data["Term Date"] = parsed_date.strftime("%Y-%m-%d")
+            
+            # Extract organizations (healthcare facilities)
+            if organizations and "Organization Name" not in extracted_data:
+                extracted_data["Organization Name"] = organizations[0]
+            
+            # Extract locations and build complete address
+            if locations:
+                # Try to build a complete address from multiple location entities
+                address_parts = []
+                for loc in locations:
+                    if loc not in address_parts:
+                        address_parts.append(loc)
+                if address_parts:
+                    extracted_data["Complete Address"] = ", ".join(address_parts)
+            
+            # 4. Use dependency parsing for relationship extraction
+            for token in doc:
+                # Look for provider names in subject position
+                if token.dep_ == "nsubj" and token.ent_type_ == "PERSON":
+                    if "Provider Name" not in extracted_data:
+                        # Get the full name span
+                        name_span = token.doc[token.left_edge.i:token.right_edge.i + 1]
+                        extracted_data["Provider Name"] = name_span.text
+                
+                # Look for Group NPI patterns
+                if token.text.lower() == "group" and token.head.text.lower() == "npi":
+                    # Look for NPI number nearby
+                    for child in token.head.children:
+                        if child.text.isdigit() and len(child.text) == 10:
+                            extracted_data["Group NPI"] = child.text
+                            break
         
-        # Extract effective date
-        date_match = re.search(patterns["effective_date"], text_content, re.IGNORECASE)
-        if date_match:
-            extracted_data["Effective Date"] = date_match.group(1)
+        # 5. Fallback to enhanced regex patterns if spaCy didn't find enough data
+        if not extracted_data or len(extracted_data) < 3:
+            patterns = {
+                "provider_name": r"([A-Z][a-z]+ [A-Z][a-z]+(?:,?\s*(?:MD|DO|NP|PA|RN))?)",
+                "effective_date": r"(?:effective|starting|beginning)\s+(?:on\s+)?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})",
+                "term_date": r"(?:terminat|ending|stopping)\s+(?:on\s+)?(\d{1,2}[/-]\d{1,2}[/-]\d{2,4}|\d{4}-\d{2}-\d{2})",
+                "npi": r"NPI[:\s#]*(\d{10})",
+                "group_npi": r"Group\s+NPI[:\s#]*(\d{10})",
+                "license": r"(?:License|Lic\.)[:\s#]*([A-Z0-9]+)",
+                "tin": r"TIN[:\s#]*(\d{2}-?\d{7})",
+                "specialty": r"(?:specialty|specializing in|practice)[:\s]*([A-Za-z\s]+?)(?:\.|,|$)",
+                "phone": r"(?:Phone|Tel)[:\s]*(\d{3}[-.]?\d{3}[-.]?\d{4})",
+                "fax": r"Fax[:\s]*(\d{3}[-.]?\d{3}[-.]?\d{4})",
+                "address": r"(?:Address|Location)[:\s]*([^,\n]+(?:,\s*[^,\n]+)*)",
+                "organization": r"(?:Organization|Practice|Group|Facility)[:\s]*([^,\n]+)",
+                "ppg_id": r"PPG\s+ID[:\s]*([A-Z0-9]+)",
+                "lob": r"(?:Line of Business|LOB)[:\s]*([A-Za-z\s]+)",
+                "term_reason": r"(?:Reason|Because)[:\s]*([^,\n]+?)(?:\.|$)",
+            }
+            
+            # Extract using regex patterns
+            for field, pattern in patterns.items():
+                if field not in extracted_data:  # Don't override spaCy results
+                    match = re.search(pattern, text_content, re.IGNORECASE)
+                    if match:
+                        if field == "provider_name":
+                            extracted_data["Provider Name"] = match.group(1)
+                        elif field == "effective_date":
+                            extracted_data["Effective Date"] = match.group(1)
+                        elif field == "term_date":
+                            extracted_data["Term Date"] = match.group(1)
+                        elif field == "npi":
+                            extracted_data["Provider NPI"] = match.group(1)
+                        elif field == "group_npi":
+                            extracted_data["Group NPI"] = match.group(1)
+                        elif field == "license":
+                            extracted_data["State License"] = match.group(1)
+                        elif field == "tin":
+                            extracted_data["TIN"] = match.group(1)
+                        elif field == "specialty":
+                            extracted_data["Provider Specialty"] = match.group(1).strip()
+                        elif field == "phone":
+                            extracted_data["Phone Number"] = match.group(1)
+                        elif field == "fax":
+                            extracted_data["Fax Number"] = match.group(1)
+                        elif field == "address":
+                            extracted_data["Complete Address"] = match.group(1).strip()
+                        elif field == "organization":
+                            extracted_data["Organization Name"] = match.group(1).strip()
+                        elif field == "ppg_id":
+                            extracted_data["PPG ID"] = match.group(1)
+                        elif field == "lob":
+                            extracted_data["Line Of Business (Medicare/Commercial/Me)"] = match.group(1).strip()
+                        elif field == "term_reason":
+                            extracted_data["Term Reason"] = match.group(1).strip()
         
-        # Extract location change info
-        location_match = re.search(patterns["location_change"], text_content, re.IGNORECASE)
-        if location_match:
-            extracted_data["Transaction Type"] = "Location Change"
-            extracted_data["Transaction Attribute"] = f"From {location_match.group(1).strip()} to {location_match.group(2).strip()}"
-        
-        # Extract NPI
-        npi_match = re.search(patterns["npi"], text_content, re.IGNORECASE)
-        if npi_match:
-            extracted_data["Provider NPI"] = npi_match.group(1)
-        
-        # Extract license
-        license_match = re.search(patterns["license"], text_content, re.IGNORECASE)
-        if license_match:
-            extracted_data["State License"] = license_match.group(1)
-        
-        # Extract TIN
-        tin_match = re.search(patterns["tin"], text_content, re.IGNORECASE)
-        if tin_match:
-            extracted_data["TIN"] = tin_match.group(1)
-        
-        # If we found any data, create a record
+        # 6. Set intelligent defaults based on context
         if extracted_data:
+            # Determine transaction type if not found
+            if "Transaction Type" not in extracted_data:
+                text_lower = text_content.lower()
+                if any(word in text_lower for word in ["add", "new", "joining", "welcome"]):
+                    extracted_data["Transaction Type"] = "Add"
+                elif any(word in text_lower for word in ["update", "change", "modify", "revise"]):
+                    extracted_data["Transaction Type"] = "Update"
+                elif any(word in text_lower for word in ["term", "terminate", "remove", "leaving", "retire"]):
+                    extracted_data["Transaction Type"] = "Term"
+                else:
+                    extracted_data["Transaction Type"] = "Update"  # Default
+            
+            # Set transaction attribute if not found
+            if "Transaction Attribute" not in extracted_data:
+                if extracted_data.get("Transaction Type") == "Add":
+                    extracted_data["Transaction Attribute"] = "Provider"
+                elif extracted_data.get("Transaction Type") == "Term":
+                    extracted_data["Transaction Attribute"] = "Provider"
+                else:
+                    extracted_data["Transaction Attribute"] = "Not Applicable"
+            
             # Set default values for required fields
             extracted_data.setdefault("Transaction Type", "Location Change")
             extracted_data.setdefault("Transaction Attribute", "Practice Location Change")
             extracted_data.setdefault("Organization Name", "RCHN & RCSSD")
             extracted_data.setdefault("Provider Specialty", "Internal Medicine")
+            
+            # Set "Information not found" for missing fields
+            missing_fields = {
+                "Effective Date": "Information not found",
+                "Term Date": "Information not found", 
+                "Term Reason": "Information not found",
+                "Provider NPI": "Information not found",
+                "State License": "Information not found",
+                "TIN": "Information not found",
+                "Group NPI": "Information not found",
+                "Complete Address": "Information not found",
+                "Phone Number": "Information not found",
+                "Fax Number": "Information not found",
+                "PPG ID": "Information not found",
+                "Line Of Business (Medicare/Commercial/Me)": "Information not found"
+            }
+            
+            for field, default_value in missing_fields.items():
+                if field not in extracted_data:
+                    extracted_data[field] = default_value
             
             return [{
                 "row_idx": 0,

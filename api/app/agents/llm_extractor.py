@@ -86,13 +86,25 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     logger.info("Starting LLM extraction", job_id=state.get("job_id"))
     
     try:
-        # Get email content from state
-        email_content = state.get("email_content", {})
-        if not email_content:
-            raise ValueError("No email content found in state")
+        # Get email content from state - use the same structure as extract_rule
+        classification = state.get("classification", {})
+        artifacts = classification.get("artifacts", [])
+        
+        if not artifacts:
+            raise ValueError("No classified artifacts found in state")
+        
+        # Find email body artifact
+        email_body = None
+        for artifact in artifacts:
+            if artifact.get("document_type") == "PLAIN_TEXT" and "email_body" in artifact.get("content", ""):
+                email_body = artifact
+                break
+        
+        if not email_body:
+            raise ValueError("No email body artifact found in classified artifacts")
         
         # Extract text content from email
-        text_content = _extract_text_from_email(email_content)
+        text_content = _extract_text_from_email_state(state)
         if not text_content:
             raise ValueError("No text content found in email")
         
@@ -102,8 +114,19 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
         # Validate and clean the extracted data
         validated_data = _validate_llm_output(extracted_data)
         
-        # Update state with extracted data
-        state["extracted_data"] = validated_data
+        # Update state with extracted data in the correct format
+        # Convert to the expected structure with row_idx, data, confidence, etc.
+        formatted_data = []
+        for idx, record in enumerate(validated_data):
+            formatted_data.append({
+                "row_idx": idx,
+                "data": record,
+                "confidence": 0.9,  # High confidence for LLM extraction
+                "extraction_method": "llm",
+                "source": "llm_extraction"
+            })
+        
+        state["extracted_data"] = formatted_data
         state["extraction_method"] = "llm"
         state["llm_used"] = True
         
@@ -124,34 +147,55 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
         
         return state
 
-def _extract_text_from_email(email_content: Dict[str, Any]) -> str:
+def _extract_text_from_email_state(state: Dict[str, Any]) -> str:
     """
     Extract text content from email for LLM processing
     """
     text_parts = []
     
-    # Extract from email body
-    if "body" in email_content:
-        body = email_content["body"]
+    # Get classified artifacts from state
+    classification = state.get("classification", {})
+    artifacts = classification.get("artifacts", [])
+
+    # Extract from email body artifact
+    for artifact in artifacts:
+        if artifact.get("document_type") == "PLAIN_TEXT":
+            content = artifact.get("content", "")
+            if content:
+                text_parts.append(f"Email Content: {content}")
         
-        # HTML content
-        if "html" in body and body["html"]:
-            # Remove HTML tags for cleaner text
-            import re
-            html_text = re.sub(r'<[^>]+>', ' ', body["html"])
-            html_text = re.sub(r'\s+', ' ', html_text).strip()
-            if html_text:
-                text_parts.append(f"HTML Content: {html_text}")
-        
-        # Plain text content
-        if "text" in body and body["text"]:
-            text_parts.append(f"Plain Text: {body['text']}")
+        elif artifact.get("document_type") == "HTML_TABLE":
+            content = artifact.get("content", "")
+            if content:
+                # Clean HTML for better LLM processing
+                import re
+                html_text = re.sub(r'<[^>]+>', ' ', content)
+                html_text = re.sub(r'\s+', ' ', html_text).strip()
+                if html_text:
+                    text_parts.append(f"HTML Table Content: {html_text}")
+
+    # Also check original artifacts for additional context
+    original_artifacts = state.get("artifacts", {})
+    email_body = original_artifacts.get("email_body", {})
     
+    # HTML content
+    if "html" in email_body and email_body["html"]:
+        import re
+        html_text = re.sub(r'<[^>]+>', ' ', email_body["html"])
+        html_text = re.sub(r'\s+', ' ', html_text).strip()
+        if html_text:
+            text_parts.append(f"HTML Content: {html_text}")
+
+    # Plain text content
+    if "text" in email_body and email_body["text"]:
+        text_parts.append(f"Plain Text: {email_body['text']}")
+
     # Extract from attachments if any
-    if "attachments" in email_content:
-        for attachment in email_content["attachments"]:
-            if attachment.get("content_type") == "text/plain":
-                text_parts.append(f"Attachment: {attachment.get('content', '')}")
+    attachments = original_artifacts.get("attachments", [])
+    for attachment in attachments:
+        if attachment.get("content_type") == "text/plain":
+            # Note: We don't have attachment content in state, just metadata
+            text_parts.append(f"Attachment: {attachment.get('filename', 'Unknown')}")
     
     return "\n\n".join(text_parts)
 

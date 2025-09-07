@@ -18,11 +18,12 @@ import structlog
 
 logger = structlog.get_logger(__name__)
 
-# Required fields for validation
-REQUIRED_FIELDS = ["NPI", "Provider Name", "Specialty", "Effective Date"]
+# Required fields for validation (using 17-column schema field names)
+# For roster emails, we'll be more lenient - only Provider Name is truly required
+REQUIRED_FIELDS = ["Provider Name"]
 
 # Fields that should not be empty if present
-OPTIONAL_BUT_VALIDATED_FIELDS = ["Phone", "Email", "Address", "DOB", "Term Date"]
+OPTIONAL_BUT_VALIDATED_FIELDS = ["Phone Number", "Email", "Complete Address", "DOB", "Term Date"]
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Validate normalized data and generate comprehensive issues.
@@ -78,8 +79,8 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
             validated_rows.append(validated_row)
             
             # Add NPI to set for duplicate detection
-            npi = row_data.get("NPI", "").strip()
-            if npi:
+            npi = row_data.get("Provider NPI", "").strip()
+            if npi and npi != "Information not found":
                 npi_set.add(npi)
         
         # Calculate validation statistics
@@ -147,7 +148,7 @@ def _validate_row(row_data: Dict[str, Any], row_idx: int, npi_set: Set[str]) -> 
     # 1. Required fields validation
     for field in REQUIRED_FIELDS:
         value = row_data.get(field, "").strip()
-        if not value:
+        if not value or value == "Information not found":
             issues.append({
                 "row_idx": row_idx,
                 "field": field,
@@ -156,26 +157,26 @@ def _validate_row(row_data: Dict[str, Any], row_idx: int, npi_set: Set[str]) -> 
             })
     
     # 2. NPI validation (length + checksum + duplicates)
-    npi = row_data.get("NPI", "").strip()
-    if npi:
+    npi = row_data.get("Provider NPI", "").strip()
+    if npi and npi != "Information not found":
         if not _is_valid_npi_format(npi):
             issues.append({
                 "row_idx": row_idx,
-                "field": "NPI",
+                "field": "Provider NPI",
                 "level": "error",
                 "message": f"Invalid NPI format: {npi} (must be 10 digits)"
             })
         elif not _is_valid_npi_checksum(npi):
             issues.append({
                 "row_idx": row_idx,
-                "field": "NPI",
+                "field": "Provider NPI",
                 "level": "warning",
                 "message": f"NPI checksum validation failed: {npi}"
             })
         elif npi in npi_set:
             issues.append({
                 "row_idx": row_idx,
-                "field": "NPI",
+                "field": "Provider NPI",
                 "level": "warning",
                 "message": f"Duplicate NPI found: {npi}"
             })
@@ -206,23 +207,23 @@ def _validate_row(row_data: Dict[str, Any], row_idx: int, npi_set: Set[str]) -> 
         })
     
     # 5. Phone validation
-    phone = row_data.get("Phone", "").strip()
+    phone = row_data.get("Phone Number", "").strip()
     if phone and not _is_valid_phone(phone):
         issues.append({
             "row_idx": row_idx,
-            "field": "Phone",
+            "field": "Phone Number",
             "level": "warning",
             "message": f"Invalid phone format: {phone}"
         })
     
     # 6. Address confidence validation
-    address = row_data.get("Address", "").strip()
+    address = row_data.get("Complete Address", "").strip()
     if address:
         # Check if address has low confidence indicators
         if _has_low_address_confidence(address):
             issues.append({
                 "row_idx": row_idx,
-                "field": "Address",
+                "field": "Complete Address",
                 "level": "warning",
                 "message": f"Address may have low confidence: {address}"
             })

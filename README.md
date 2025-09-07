@@ -1,4 +1,4 @@
-# HiLabs Roster Automation (Scalable, Local-first, Multi-Agent, SLM-GRPO Training)
+# HiLabs Roster Automation (Scalable, Local-first, Multi-Agent, SLM-GRPO RL Training)
 
 > **Touchless end-to-end roster processing** — from raw emails (`.eml`, PDFs, images, HTML tables, CSV/XLSX) to a perfectly formatted Excel in one click.
 > **Everything runs 100% locally** (no proprietary APIs, no third-party uploads).

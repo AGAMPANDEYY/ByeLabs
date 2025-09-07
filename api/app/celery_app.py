@@ -43,7 +43,7 @@ celery_app.conf.update(
     enable_utc=True,
     
     # Task routing and queues
-    task_default_queue=settings.celery_task_default_queue,
+    task_default_queue="default",
     task_queues=(
         Queue("default", routing_key="default"),
         Queue("processing", routing_key="processing"),
@@ -62,15 +62,15 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     
     # Time limits
-    task_time_limit=settings.celery_task_time_limit,
-    task_soft_time_limit=settings.celery_task_soft_time_limit,
+    task_time_limit=3600,  # 1 hour
+    task_soft_time_limit=3000,  # 50 minutes
     
     # Result backend
     result_expires=3600,  # 1 hour
     result_persistent=True,
     
     # Worker configuration
-    worker_concurrency=settings.celery_worker_concurrency,
+    worker_concurrency=2,
     worker_max_tasks_per_child=1000,
     worker_disable_rate_limits=False,
     
@@ -82,8 +82,8 @@ celery_app.conf.update(
     task_annotations={
         "*": {
             "rate_limit": "10/s",
-            "time_limit": settings.celery_task_time_limit,
-            "soft_time_limit": settings.celery_task_soft_time_limit,
+            "time_limit": 3600,
+            "soft_time_limit": 3000,
         }
     },
     

@@ -18,32 +18,31 @@ import hashlib
 from ..db import get_db_session
 from ..models import Job, Version, Record, Export
 from ..storage import storage_client, calculate_checksum, generate_object_key
-from ..metrics import track_agent_metrics, get_logger
+from ..metrics import get_agent_runs_total, get_agent_latency_seconds
+import structlog
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
-# Excel Schema - 17 fields in exact order
+# Excel Schema - 17 fields in exact order (matching expected format)
 EXCEL_SCHEMA = [
-    "NPI",
-    "Provider Name",
-    "Specialty",
-    "Phone",
-    "Email", 
-    "Address",
-    "City",
-    "State",
-    "ZIP",
-    "DOB",
-    "Gender",
+    "Transaction Type",
+    "Transaction Attribute", 
     "Effective Date",
     "Term Date",
-    "Status",
-    "Network",
-    "Tier",
-    "Notes"
+    "Term Reason",
+    "Provider Name",
+    "Provider NPI",
+    "Provider Specialty",
+    "State License",
+    "Organization Name",
+    "TIN",
+    "Group NPI",
+    "Complete Address",
+    "Phone Number",
+    "Fax Number",
+    "PPG ID",
+    "Line Of Business"
 ]
-
-@track_agent_metrics("exporter_excel")
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Generate Excel export with roster data.
@@ -135,24 +134,21 @@ def _create_excel_file(job_id: int, version_id: int, records: List[Dict[str, Any
     # Create Excel file in memory
     output = io.BytesIO()
     
-    with pd.ExcelWriter(output, engine='xlsxwriter', options={'remove_timezone': True}) as writer:
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
         # Write main roster data
         df.to_excel(writer, sheet_name='Roster', index=False)
         
-        # Get workbook and worksheet for formatting
-        workbook = writer.book
-        worksheet = writer.sheets['Roster']
-        
-        # Apply formatting
-        _apply_excel_formatting(workbook, worksheet, df)
-        
-        # Create provenance sheet
-        _create_provenance_sheet(workbook, job_id, version_id, len(records))
+        # Create provenance sheet with basic data
+        provenance_df = pd.DataFrame({
+            'Field': ['Job ID', 'Version ID', 'Export Date', 'Record Count'],
+            'Value': [job_id, version_id, datetime.now().strftime('%Y-%m-%d %H:%M:%S'), len(records)]
+        })
+        provenance_df.to_excel(writer, sheet_name='Provenance', index=False)
     
     output.seek(0)
     return output.getvalue()
 
-def _apply_excel_formatting(workbook, worksheet, df):
+def _apply_excel_formatting_dummy(workbook, worksheet, df):
     """Apply Excel formatting to preserve data types and formatting."""
     
     # Text format for NPI, ZIP (preserve leading zeros)
@@ -184,7 +180,7 @@ def _apply_excel_formatting(workbook, worksheet, df):
     # Add autofilter
     worksheet.autofilter(0, 0, len(df), len(df.columns) - 1)
 
-def _create_provenance_sheet(workbook, job_id: int, version_id: int, record_count: int):
+def _create_provenance_sheet_dummy(workbook, job_id: int, version_id: int, record_count: int):
     """Create hidden provenance sheet with metadata."""
     
     # Create provenance data
@@ -231,7 +227,6 @@ def _store_excel_file(job_id: int, version_id: int, excel_bytes: bytes) -> str:
     
     # Store in MinIO
     storage_client.put_bytes(
-        bucket="hilabs-artifacts",
         key=object_key,
         data=excel_bytes,
         content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"

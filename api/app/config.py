@@ -128,6 +128,7 @@ class Settings(BaseSettings):
     # PROCESSING CONFIGURATION
     # =============================================================================
     max_file_size_mb: int = Field(default=50, description="Maximum file size in MB")
+    max_upload_mb: int = Field(default=50, description="Maximum upload size in MB")
     max_attachment_size_mb: int = Field(default=25, description="Maximum attachment size in MB")
     
     # Processing timeouts (in seconds)

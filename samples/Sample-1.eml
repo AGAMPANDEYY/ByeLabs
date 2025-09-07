@@ -1,0 +1,203 @@
+Received: from MW3PR15MB3754.namprd15.prod.outlook.com (2603:10b6:303:48::18)
+ by PH3PPF362B23CA1.namprd15.prod.outlook.com with HTTPS; Mon, 1 Sep 2025
+ 13:56:38 +0000
+Received: from PH3PPF362B23CA1.namprd15.prod.outlook.com
+ (2603:10b6:518:1::494) by MW3PR15MB3754.namprd15.prod.outlook.com
+ (2603:10b6:303:48::18) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9052.18; Mon, 1 Sep
+ 2025 13:56:37 +0000
+Received: from PH3PPF362B23CA1.namprd15.prod.outlook.com
+ ([fe80::70eb:e1bb:3baf:989d]) by PH3PPF362B23CA1.namprd15.prod.outlook.com
+ ([fe80::70eb:e1bb:3baf:989d%7]) with mapi id 15.20.9052.017; Mon, 1 Sep 2025
+ 13:56:37 +0000
+From: Prajay Sapkale <prajay.sapkale@hilabs.com>
+To: Prajay Sapkale <prajay.sapkale@hilabs.com>
+Subject: Sample-1
+Thread-Topic: Sample-1
+Thread-Index: AdwbSDgx9DHnLVuLROKFqH0StqiKCQ==
+Date: Mon, 1 Sep 2025 13:56:37 +0000
+Message-ID:
+	<PH3PPF362B23CA1E44B0181FF298401D377F607A@PH3PPF362B23CA1.namprd15.prod.outlook.com>
+Accept-Language: en-GB, en-US
+Content-Language: en-US
+X-MS-Exchange-Organization-AuthAs: Internal
+X-MS-Exchange-Organization-AuthMechanism: 04
+X-MS-Exchange-Organization-AuthSource:
+	PH3PPF362B23CA1.namprd15.prod.outlook.com
+X-MS-Has-Attach:
+X-MS-Exchange-Organization-Network-Message-Id:
+	42dbb81c-6a23-4bb4-55c6-08dde95f5e5d
+X-MS-Exchange-Organization-SCL: 1
+X-MS-TNEF-Correlator:
+X-MS-Exchange-Organization-RecordReviewCfmType: 0
+x-ms-publictraffictype: Email
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=hilabs.com;
+x-ms-office365-filtering-correlation-id: 42dbb81c-6a23-4bb4-55c6-08dde95f5e5d
+x-ms-traffictypediagnostic:
+	PH3PPF362B23CA1:EE_|MW3PR15MB3754:EE_|PH3PPF362B23CA1:EE_
+x-microsoft-antispam: BCL:0;ARA:13230040|366016|8096899003|41050700001;
+x-forefront-antispam-report:
+	CIP:255.255.255.255;CTRY:;LANG:en;SCL:1;SRV:;IPV:NLI;SFV:NSPM;H:PH3PPF362B23CA1.namprd15.prod.outlook.com;PTR:;CAT:NONE;SFS:(13230040)(366016)(8096899003)(41050700001);DIR:INT;
+x-ms-exchange-crosstenant-authas: Internal
+x-ms-exchange-crosstenant-authsource:
+	PH3PPF362B23CA1.namprd15.prod.outlook.com
+x-ms-exchange-crosstenant-network-message-id:
+	42dbb81c-6a23-4bb4-55c6-08dde95f5e5d
+x-ms-exchange-crosstenant-originalarrivaltime: 01 Sep 2025 13:56:37.0746 (UTC)
+x-ms-exchange-crosstenant-fromentityheader: Hosted
+x-ms-exchange-crosstenant-id: 00f78908-dfdd-4541-b78e-c377d4dbe6e2
+x-ms-exchange-transport-crosstenantheadersstamped: MW3PR15MB3754
+x-ms-exchange-transport-endtoendlatency: 00:00:01.4712672
+x-ms-exchange-processed-by-bccfoldering: 15.20.9052.000
+x-ms-exchange-crosstenant-mailboxtype: HOSTED
+x-ms-exchange-crosstenant-userprincipalname:
+	1T1RT337o3H4x/DYDKaT8ig2/2aJOhOwqu76kBxQ3kWoOZRzJ0XTrsyMasSb+rcgRHjfGlE3Ve1TBNvb9OxMsQ==
+X-Microsoft-Antispam-Mailbox-Delivery:
+	ucf:0;jmr:0;auth:0;dest:I;ENG:(910005)(944506478)(944626604)(920097)(425001)(930097)(140003);
+X-Microsoft-Antispam-Message-Info:
+	c6fbcbEiSxf3cMQ76C+bOiwWcAIa5C1xgp7XdWoahKaVgOOJw5swcSr6R45TjmGlU56msNL1qYI1Y0yrGMaUJYnDwJvxAtQuKqqTjoGkVHH1vVDcA8Lo37esOqjRXLSVIkqBvNuXj/dM/9XTwV9H+2LHeBWDUR5CvFGGkxNjjlEvjMEELBSMv6oxyGr89nVNiW8e/qVTSlXo79IQu4L0AH1d/3MZV0I4n03g7tJBRqIZ/MY9HWQi2KoaWGd1k25EwHFQ6VqFyoTVSdu/Gj7evDnJdxZrDROLIWqg7/y1Y0IVKtQ4zkEMnUKPMZxavJFeeSw3xUcfCSwIjdYBBSJ6nRXTrhch2vlCJEKJ8NyHzXbX+goYjZBZaZZX7KVJd4hGdMkXZn6t3T7iXe1TlXQckDs6AKGgQTgXvMk8QU+q9CX3WnI2KZhPqTkIBGdRbT8NMNvHkVTxzCS7bTRKfelIEjAe2DtYSK6Moz9no/zn99yskWfzg1tvK3WxS/rSZ/F4BUAjSOi50se1Wq3MUyTd39LJGqyNkVltt7FGwKfoClZKDxlByD4/d9t6iS8HC9Ua8A5LebawC1bOQJH/DitDzW1BQG1oxCljb5NbylyqQsW+8e1cLlj/tn+wIgdTFDXZfLIEI6zBNHgaADw5CEs2I068FsmdsopbmVN6agG66NVpia7IP9laRrCJvcO5S0nMPb3Wif/3V9GlcP36IC0YlB53Hrqd2Pmt0UJjHbeBf8fS5ypm8mYyNzZB25BC6kya+ST7tZjEjzJTR+fo2CW03Lay8VR8iDitOpU+zmSNX2s=
+Content-Type: multipart/alternative;
+	boundary="_000_PH3PPF362B23CA1E44B0181FF298401D377F607APH3PPF362B23CA1_"
+MIME-Version: 1.0
+
+--_000_PH3PPF362B23CA1E44B0181FF298401D377F607APH3PPF362B23CA1_
+Content-Type: text/plain; charset="us-ascii"
+
+Dear Aetna, Anthem, Cigna, Blue Shield, Health Net, Scripps, Sharp, and UHC:
+
+Please TERMINATE the following provider from your roster effective ACCORDINGLY. Termination is for the following line of business: FFS/PPO/ACO/HMO/Medi-Cal
+
+Pursuant to the terms and provisions of our contract, this document serves as notification that the following physician(s) has TERMINATED with RCHN & RCSSD (TIN # 82-1111113)
+Provider Name:
+NPI#:
+Specialty:
+Provider Type:
+Term Date:
+Reason
+Cole Garrett
+1222222250
+Pediatric Emergency Medicine
+Specialist
+8/1/2025
+Voluntary
+
+
+
+
+Best Regards
+Prajay
+
+--_000_PH3PPF362B23CA1E44B0181FF298401D377F607APH3PPF362B23CA1_
+Content-Type: text/html; charset="us-ascii"
+
+<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:m="http://schemas.microsoft.com/office/2004/12/omml" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+<meta name="Generator" content="Microsoft Word 15 (filtered medium)">
+<style><!--
+/* Font Definitions */
+@font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;}
+@font-face
+	{font-family:Aptos;}
+/* Style Definitions */
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin:0cm;
+	font-size:11.0pt;
+	font-family:"Aptos",sans-serif;
+	mso-ligatures:standardcontextual;
+	mso-fareast-language:EN-US;}
+span.EmailStyle17
+	{mso-style-type:personal-compose;
+	font-family:"Aptos",sans-serif;
+	color:windowtext;}
+.MsoChpDefault
+	{mso-style-type:export-only;
+	font-size:11.0pt;
+	mso-fareast-language:EN-US;}
+@page WordSection1
+	{size:612.0pt 792.0pt;
+	margin:72.0pt 72.0pt 72.0pt 72.0pt;}
+div.WordSection1
+	{page:WordSection1;}
+--></style><!--[if gte mso 9]><xml>
+<o:shapedefaults v:ext="edit" spidmax="1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+<o:shapelayout v:ext="edit">
+<o:idmap v:ext="edit" data="1" />
+</o:shapelayout></xml><![endif]-->
+</head>
+<body lang="EN-IN" link="#467886" vlink="#96607D" style="word-wrap:break-word">
+<div class="WordSection1">
+<p class="MsoNormal"><b><span lang="EN-US" style="font-size:14.0pt">Dear Aetna, Anthem, Cigna, Blue Shield, Health Net, Scripps, Sharp, and UHC:</span></b><span lang="EN-US" style="font-size:14.0pt"><o:p></o:p></span></p>
+<p class="MsoNormal"><span lang="EN-US" style="font-size:14.0pt"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal"><span lang="EN-US" style="font-size:14.0pt">Please <b><u>TERMINATE</u></b> the following provider from your roster
+<b><u>effective ACCORDINGLY.</u></b> Termination is for the following line of business:
+<b><span style="color:red">FFS/PPO/ACO/HMO/Medi-Cal </span></b><o:p></o:p></span></p>
+<p class="MsoNormal"><span lang="EN-US" style="font-size:14.0pt"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal" style="margin-bottom:14.0pt;page-break-after:avoid"><span lang="EN-US" style="font-size:14.0pt">Pursuant to the terms and provisions of our contract, this document serves as notification that the following physician(s) has
+<b>TERMINATED</b> with <b><u>RCHN &amp; RCSSD (TIN # 82-1111113)<o:p></o:p></u></b></span></p>
+<table class="MsoNormalTable" border="0" cellspacing="0" cellpadding="0" style="border-collapse:collapse">
+<tbody>
+<tr style="height:19.25pt">
+<td width="161" valign="top" style="width:121.1pt;border:solid windowtext 1.0pt;background:#A6A6A6;padding:0cm 5.4pt 0cm 5.4pt;height:19.25pt">
+<p class="MsoNormal" style="line-height:115%;page-break-after:avoid"><b><span style="font-size:14.0pt;line-height:115%;color:black">Provider Name:</span></b><b><span style="font-size:14.0pt;line-height:115%"><o:p></o:p></span></b></p>
+</td>
+<td width="102" valign="top" style="width:76.5pt;border:solid windowtext 1.0pt;border-left:none;background:#A6A6A6;padding:0cm 0cm 0cm 0cm;height:19.25pt">
+<p class="MsoNormal" style="line-height:115%;page-break-after:avoid"><b><span style="font-size:14.0pt;line-height:115%;color:black">NPI#:</span></b><b><span style="font-size:14.0pt;line-height:115%"><o:p></o:p></span></b></p>
+</td>
+<td width="222" valign="top" style="width:166.5pt;border:solid windowtext 1.0pt;border-left:none;background:#A6A6A6;padding:0cm 5.4pt 0cm 5.4pt;height:19.25pt">
+<p class="MsoNormal" style="line-height:115%;page-break-after:avoid"><b><span style="font-size:14.0pt;line-height:115%;color:black">Specialty:</span></b><b><span style="font-size:14.0pt;line-height:115%"><o:p></o:p></span></b></p>
+</td>
+<td width="138" valign="top" style="width:103.5pt;border:solid windowtext 1.0pt;border-left:none;background:#A6A6A6;padding:0cm 0cm 0cm 0cm;height:19.25pt">
+<p class="MsoNormal" style="line-height:115%;page-break-after:avoid"><b><span style="font-size:14.0pt;line-height:115%;color:black">Provider Type:</span></b><b><span style="font-size:14.0pt;line-height:115%"><o:p></o:p></span></b></p>
+</td>
+<td width="114" valign="top" style="width:85.5pt;border:solid windowtext 1.0pt;border-left:none;background:#A6A6A6;padding:0cm 5.4pt 0cm 5.4pt;height:19.25pt">
+<p class="MsoNormal" style="line-height:115%;page-break-after:avoid"><b><span style="font-size:14.0pt;line-height:115%;color:black">Term Date:</span></b><b><span style="font-size:14.0pt;line-height:115%"><o:p></o:p></span></b></p>
+</td>
+<td width="108" valign="top" style="width:81.0pt;border:solid windowtext 1.0pt;border-left:none;background:#A6A6A6;padding:0cm 0cm 0cm 0cm;height:19.25pt">
+<p class="MsoNormal" style="line-height:115%;page-break-after:avoid"><b><span style="font-size:14.0pt;line-height:115%;color:black">Reason</span></b><b><span style="font-size:14.0pt;line-height:115%"><o:p></o:p></span></b></p>
+</td>
+</tr>
+<tr style="height:9.05pt">
+<td width="161" valign="top" style="width:121.1pt;border:solid windowtext 1.0pt;border-top:none;padding:0cm 5.4pt 0cm 5.4pt;height:9.05pt">
+<p class="MsoNormal"><b><span style="font-size:12.0pt">Cole Garrett<o:p></o:p></span></b></p>
+</td>
+<td width="102" valign="top" style="width:76.5pt;border-top:none;border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;padding:0cm 0cm 0cm 0cm;height:9.05pt">
+<p class="MsoNormal" style="line-height:115%"><span style="font-size:12.0pt;line-height:115%;color:black">1222222250</span><span style="font-size:12.0pt;line-height:115%"><o:p></o:p></span></p>
+</td>
+<td width="222" valign="top" style="width:166.5pt;border-top:none;border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;padding:0cm 5.4pt 0cm 5.4pt;height:9.05pt">
+<p class="MsoNormal" style="line-height:115%"><span style="font-size:12.0pt;line-height:115%">Pediatric Emergency Medicine<o:p></o:p></span></p>
+</td>
+<td width="138" valign="top" style="width:103.5pt;border-top:none;border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;padding:0cm 0cm 0cm 0cm;height:9.05pt">
+<p class="MsoNormal" style="line-height:115%;page-break-after:avoid"><span style="font-size:12.0pt;line-height:115%">Specialist<o:p></o:p></span></p>
+</td>
+<td width="114" valign="top" style="width:85.5pt;border-top:none;border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;padding:0cm 5.4pt 0cm 5.4pt;height:9.05pt">
+<p class="MsoNormal"><span style="font-size:12.0pt">8/1/2025<o:p></o:p></span></p>
+</td>
+<td width="108" valign="top" style="width:81.0pt;border-top:none;border-left:none;border-bottom:solid windowtext 1.0pt;border-right:solid windowtext 1.0pt;padding:0cm 0cm 0cm 0cm;height:9.05pt">
+<p class="MsoNormal"><span style="font-size:12.0pt">Voluntary<o:p></o:p></span></p>
+</td>
+</tr>
+</tbody>
+</table>
+<p class="MsoNormal"><span lang="EN-US" style="font-family:&quot;Calibri&quot;,sans-serif"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal"><span lang="EN-US"><o:p>&nbsp;</o:p></span></p>
+<p class="MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class="MsoNormal"><o:p>&nbsp;</o:p></p>
+<div>
+<p class="MsoNormal"><span style="font-size:12.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:black;mso-ligatures:none;mso-fareast-language:EN-IN">Best Regards</span><span style="font-size:12.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:black;mso-ligatures:none;mso-fareast-language:EN-IN"><o:p></o:p></span></p>
+</div>
+<div>
+<p class="MsoNormal"><span style="font-size:12.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:black;mso-ligatures:none;mso-fareast-language:EN-IN">Prajay</span><o:p></o:p></p>
+</div>
+</div>
+</body>
+</html>
+
+--_000_PH3PPF362B23CA1E44B0181FF298401D377F607APH3PPF362B23CA1_--

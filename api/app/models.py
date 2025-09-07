@@ -81,7 +81,7 @@ class Job(Base):
     
     id = Column(Integer, primary_key=True, index=True)
     email_id = Column(Integer, ForeignKey("emails.id", ondelete="CASCADE"), nullable=False)
-    status = Column(String(20), nullable=False, default=JobStatus.PENDING, index=True)
+    status = Column(String(20), nullable=False, default=JobStatus.PENDING.value, index=True)
     current_version_id = Column(Integer, ForeignKey("versions.id", ondelete="SET NULL"), nullable=True)
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     updated_at = Column(DateTime(timezone=True), nullable=False, default=func.now(), onupdate=func.now())
@@ -89,7 +89,7 @@ class Job(Base):
     # Relationships
     email = relationship("Email", back_populates="jobs")
     current_version = relationship("Version", foreign_keys=[current_version_id], post_update=True)
-    versions = relationship("Version", back_populates="job", cascade="all, delete-orphan")
+    versions = relationship("Version", back_populates="job", foreign_keys="Version.job_id", cascade="all, delete-orphan")
     exports = relationship("Export", back_populates="job", cascade="all, delete-orphan")
     audit_logs = relationship("AuditLog", back_populates="job", cascade="all, delete-orphan")
     
@@ -98,7 +98,7 @@ class Job(Base):
         Index('idx_jobs_status', 'status'),
         Index('idx_jobs_created_at', 'created_at'),
         Index('idx_jobs_updated_at', 'updated_at'),
-        CheckConstraint(f"status IN ('{JobStatus.PENDING}', '{JobStatus.PROCESSING}', '{JobStatus.NEEDS_REVIEW}', '{JobStatus.READY}', '{JobStatus.FAILED}', '{JobStatus.CANCELLED}')", name='ck_jobs_status'),
+        CheckConstraint("status IN ('pending', 'processing', 'needs_review', 'ready', 'failed', 'cancelled')", name='ck_jobs_status'),
     )
     
     def __repr__(self):
@@ -122,7 +122,7 @@ class Version(Base):
     created_at = Column(DateTime(timezone=True), nullable=False, default=func.now())
     
     # Relationships
-    job = relationship("Job", back_populates="versions")
+    job = relationship("Job", back_populates="versions", foreign_keys=[job_id])
     parent_version = relationship("Version", remote_side=[id], backref="child_versions")
     records = relationship("Record", back_populates="version", cascade="all, delete-orphan")
     issues = relationship("Issue", back_populates="version", cascade="all, delete-orphan")
@@ -203,7 +203,7 @@ class Issue(Base):
         Index('idx_issues_level', 'level'),
         Index('idx_issues_row_idx', 'row_idx'),
         Index('idx_issues_field', 'field'),
-        CheckConstraint(f"level IN ('{IssueLevel.ERROR}', '{IssueLevel.WARNING}', '{IssueLevel.INFO}')", name='ck_issues_level'),
+        CheckConstraint("level IN ('error', 'warning', 'info')", name='ck_issues_level'),
     )
     
     def __repr__(self):

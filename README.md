@@ -48,6 +48,33 @@ The `run.sh` script will:
 | **VLM Health Check** | [http://localhost:8080/health](http://localhost:8080/health) | - |
 | **Flower (Task Monitor)** | [http://localhost:5555](http://localhost:5555) | `admin` / `admin` |
 
+## 🤖 Local LLM Configuration (Optional)
+
+The system includes optional local LLM integration for enhanced processing. By default, it's disabled and uses rule-based fallbacks.
+
+### Recommended Small Models (Fast & Lightweight)
+- `microsoft/DialoGPT-small` (117M parameters) - **Default, fastest**
+- `distilbert-base-uncased` (66M parameters) - **Smallest**
+- `microsoft/DialoGPT-medium` (345M parameters) - **Better quality**
+
+### Enable Local LLM
+```bash
+# In your .env file
+LOCAL_LLM_ENABLED=true
+LOCAL_LLM_MODEL=microsoft/DialoGPT-small
+LOCAL_LLM_MAX_TOKENS=256
+```
+
+### Disable LLM (Use Rule-Based Only)
+```bash
+# In your .env file
+LOCAL_LLM_ENABLED=false
+# OR
+LOCAL_LLM_MODEL=none
+```
+
+**Note**: If no model is specified or LLM fails to load, the system gracefully falls back to rule-based processing without errors.
+
 ***
 
 ## Process a Sample

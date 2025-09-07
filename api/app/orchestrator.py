@@ -68,50 +68,50 @@ class ProcessingState(BaseModel):
 # NODE FUNCTIONS
 # ============================================================================
 
-def intake_node(state: ProcessingState) -> ProcessingState:
+def intake_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Intake node - parse email and prepare for processing."""
-    logger.info("Running intake node", job_id=state.job_id)
+    logger.info("Running intake node", job_id=state["job_id"])
     
     try:
         # Convert state to dict for agent compatibility
         agent_state = {
-            "job_id": state.job_id,
-            "processing_notes": state.processing_notes,
-            "start_time": state.start_time or time.time()
+            "job_id": state["job_id"],
+            "processing_notes": state.get("processing_notes", []),
+            "start_time": state.get("start_time", time.time())
         }
         
         # Run intake agent
         result = intake_email_run(agent_state)
         
         # Update state
-        state.artifacts.update(result.get("artifacts", {}))
-        state.processing_notes = result.get("processing_notes", [])
+        state["artifacts"].update(result.get("artifacts", {}))
+        state["processing_notes"] = result.get("processing_notes", [])
         
         if result.get("error"):
-            state.error = result["error"]
-            state.failed_agent = "intake_email"
-            state.status = "failed"
+            state["error"] = result["error"]
+            state["failed_agent"] = "intake_email"
+            state["status"] = "failed"
         
-        logger.info("Intake node completed", job_id=state.job_id)
+        logger.info("Intake node completed", job_id=state["job_id"])
         return state
         
     except Exception as e:
-        logger.error("Intake node failed", job_id=state.job_id, error=str(e))
-        state.error = str(e)
-        state.failed_agent = "intake"
-        state.status = "failed"
+        logger.error("Intake node failed", job_id=state["job_id"], error=str(e))
+        state["error"] = str(e)
+        state["failed_agent"] = "intake"
+        state["status"] = "failed"
         return state
 
-def classify_node(state: ProcessingState) -> ProcessingState:
+def classify_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Classify node - determine processing strategy."""
-    logger.info("Running classify node", job_id=state.job_id)
+    logger.info("Running classify node", job_id=state["job_id"])
     
     try:
         # Convert state to dict for agent compatibility
         agent_state = {
-            "job_id": state.job_id,
-            "processing_notes": state.processing_notes,
-            "artifacts": state.artifacts
+            "job_id": state["job_id"],
+            "processing_notes": state.get("processing_notes", []),
+            "artifacts": state.get("artifacts", {})
         }
         
         # Run classifier agent
@@ -119,36 +119,36 @@ def classify_node(state: ProcessingState) -> ProcessingState:
         
         # Update state with classification results
         classification = result.get("classification", {})
-        state.route_map = classification
-        state.needs_vlm = classification.get("requires_vlm", False)
-        state.processing_notes = result.get("processing_notes", [])
+        state["route_map"] = classification
+        state["needs_vlm"] = classification.get("requires_vlm", False)
+        state["processing_notes"] = result.get("processing_notes", [])
         
         if result.get("error"):
-            state.error = result["error"]
-            state.failed_agent = "classifier"
-            state.status = "failed"
+            state["error"] = result["error"]
+            state["failed_agent"] = "classifier"
+            state["status"] = "failed"
         
-        logger.info("Classify node completed", job_id=state.job_id, needs_vlm=state.needs_vlm)
+        logger.info("Classify node completed", job_id=state["job_id"], needs_vlm=state["needs_vlm"])
         return state
         
     except Exception as e:
-        logger.error("Classify node failed", job_id=state.job_id, error=str(e))
-        state.error = str(e)
-        state.failed_agent = "classify"
-        state.status = "failed"
+        logger.error("Classify node failed", job_id=state["job_id"], error=str(e))
+        state["error"] = str(e)
+        state["failed_agent"] = "classify"
+        state["status"] = "failed"
         return state
 
-def extract_node(state: ProcessingState) -> ProcessingState:
+def extract_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Extract node - perform rule-based and PDF extraction."""
-    logger.info("Running extract node", job_id=state.job_id)
+    logger.info("Running extract node", job_id=state["job_id"])
     
     try:
         # Convert state to dict for agent compatibility
         agent_state = {
-            "job_id": state.job_id,
-            "processing_notes": state.processing_notes,
-            "artifacts": state.artifacts,
-            "route_map": state.route_map
+            "job_id": state["job_id"],
+            "processing_notes": state.get("processing_notes", []),
+            "artifacts": state.get("artifacts", {}),
+            "route_map": state.get("route_map", {})
         }
         
         # Run extract rule agent
@@ -162,37 +162,39 @@ def extract_node(state: ProcessingState) -> ProcessingState:
             raise Exception(f"Extract PDF failed: {result['error']}")
         
         # Update state with extracted data
-        state.rows = result.get("extracted_data", [])
-        state.processing_notes = result.get("processing_notes", [])
+        state["rows"] = result.get("extracted_data", [])
+        state["processing_notes"] = result.get("processing_notes", [])
         
         # Store checkpoint data
-        state.checkpoint_data["extract"] = {
-            "rows": state.rows,
+        if "checkpoint_data" not in state:
+            state["checkpoint_data"] = {}
+        state["checkpoint_data"]["extract"] = {
+            "rows": state["rows"],
             "timestamp": time.time()
         }
         
-        logger.info("Extract node completed", job_id=state.job_id, rows_count=len(state.rows))
+        logger.info("Extract node completed", job_id=state["job_id"], rows_count=len(state["rows"]))
         return state
         
     except Exception as e:
-        logger.error("Extract node failed", job_id=state.job_id, error=str(e))
-        state.error = str(e)
-        state.failed_agent = "extract"
-        state.status = "failed"
+        logger.error("Extract node failed", job_id=state["job_id"], error=str(e))
+        state["error"] = str(e)
+        state["failed_agent"] = "extract"
+        state["status"] = "failed"
         return state
 
-def vlm_assist_node(state: ProcessingState) -> ProcessingState:
+def vlm_assist_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """VLM assist node - use Vision Language Model for complex extraction."""
-    logger.info("Running VLM assist node", job_id=state.job_id)
+    logger.info("Running VLM assist node", job_id=state["job_id"])
     
     try:
         # Convert state to dict for agent compatibility
         agent_state = {
-            "job_id": state.job_id,
-            "processing_notes": state.processing_notes,
-            "artifacts": state.artifacts,
-            "route_map": state.route_map,
-            "extracted_data": state.rows
+            "job_id": state["job_id"],
+            "processing_notes": state.get("processing_notes", []),
+            "artifacts": state.get("artifacts", {}),
+            "route_map": state.get("route_map", {}),
+            "extracted_data": state.get("rows", [])
         }
         
         # Run VLM client agent
@@ -201,127 +203,131 @@ def vlm_assist_node(state: ProcessingState) -> ProcessingState:
         # Update state with VLM results
         vlm_data = result.get("vlm_data", {})
         if vlm_data.get("extracted_data"):
-            state.rows = vlm_data["extracted_data"]
-            state.vlm_used = True
+            state["rows"] = vlm_data["extracted_data"]
+            state["vlm_used"] = True
         
-        state.processing_notes = result.get("processing_notes", [])
+        state["processing_notes"] = result.get("processing_notes", [])
         
         # Store checkpoint data
-        state.checkpoint_data["vlm_assist"] = {
-            "rows": state.rows,
-            "vlm_used": state.vlm_used,
+        if "checkpoint_data" not in state:
+            state["checkpoint_data"] = {}
+        state["checkpoint_data"]["vlm_assist"] = {
+            "rows": state["rows"],
+            "vlm_used": state["vlm_used"],
             "timestamp": time.time()
         }
         
         if result.get("error"):
-            state.error = result["error"]
-            state.failed_agent = "vlm_client"
-            state.status = "failed"
+            state["error"] = result["error"]
+            state["failed_agent"] = "vlm_client"
+            state["status"] = "failed"
         
-        logger.info("VLM assist node completed", job_id=state.job_id, vlm_used=state.vlm_used)
+        logger.info("VLM assist node completed", job_id=state["job_id"], vlm_used=state["vlm_used"])
         return state
         
     except Exception as e:
-        logger.error("VLM assist node failed", job_id=state.job_id, error=str(e))
-        state.error = str(e)
-        state.failed_agent = "vlm_assist"
-        state.status = "failed"
+        logger.error("VLM assist node failed", job_id=state["job_id"], error=str(e))
+        state["error"] = str(e)
+        state["failed_agent"] = "vlm_assist"
+        state["status"] = "failed"
         return state
 
-def normalize_node(state: ProcessingState) -> ProcessingState:
+def normalize_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Normalize node - clean and standardize extracted data."""
-    logger.info("Running normalize node", job_id=state.job_id)
+    logger.info("Running normalize node", job_id=state["job_id"])
     
     try:
         # Convert state to dict for agent compatibility
         agent_state = {
-            "job_id": state.job_id,
-            "processing_notes": state.processing_notes,
-            "extracted_data": state.rows
+            "job_id": state["job_id"],
+            "processing_notes": state.get("processing_notes", []),
+            "extracted_data": state.get("rows", [])
         }
         
         # Run normalizer agent
         result = normalizer_run(agent_state)
         
         # Update state with normalized data
-        state.rows = result.get("normalized_data", state.rows)
-        state.processing_notes = result.get("processing_notes", [])
+        state["rows"] = result.get("normalized_data", state.get("rows", []))
+        state["processing_notes"] = result.get("processing_notes", [])
         
         # Store checkpoint data
-        state.checkpoint_data["normalize"] = {
-            "rows": state.rows,
+        if "checkpoint_data" not in state:
+            state["checkpoint_data"] = {}
+        state["checkpoint_data"]["normalize"] = {
+            "rows": state.get("rows", []),
             "timestamp": time.time()
         }
         
         if result.get("error"):
-            state.error = result["error"]
-            state.failed_agent = "normalizer"
-            state.status = "failed"
+            state["error"] = result["error"]
+            state["failed_agent"] = "normalizer"
+            state["status"] = "failed"
         
-        logger.info("Normalize node completed", job_id=state.job_id, rows_count=len(state.rows))
+        logger.info("Normalize node completed", job_id=state["job_id"], rows_count=len(state.get("rows", [])))
         return state
         
     except Exception as e:
-        logger.error("Normalize node failed", job_id=state.job_id, error=str(e))
-        state.error = str(e)
-        state.failed_agent = "normalize"
-        state.status = "failed"
+        logger.error("Normalize node failed", job_id=state["job_id"], error=str(e))
+        state["error"] = str(e)
+        state["failed_agent"] = "normalize"
+        state["status"] = "failed"
         return state
 
-def validate_node(state: ProcessingState) -> ProcessingState:
+def validate_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Validate node - check data quality and generate issues."""
-    logger.info("Running validate node", job_id=state.job_id)
+    logger.info("Running validate node", job_id=state["job_id"])
     
     try:
         # Convert state to dict for agent compatibility
         agent_state = {
-            "job_id": state.job_id,
-            "processing_notes": state.processing_notes,
-            "normalized_data": state.rows
+            "job_id": state["job_id"],
+            "processing_notes": state.get("processing_notes", []),
+            "normalized_data": state.get("rows", [])
         }
         
         # Run validator agent
         result = validator_run(agent_state)
         
         # Update state with validation results
-        state.issues = result.get("validation_issues", [])
-        state.processing_notes = result.get("processing_notes", [])
+        state["issues"] = result.get("validation_issues", [])
+        state["processing_notes"] = result.get("processing_notes", [])
         
         # Check if validation passed
         validation_stats = result.get("validation_stats", {})
         error_count = validation_stats.get("error_count", 0)
         
         if error_count > 0:
-            state.status = "needs_review"
-            logger.info("Validation found errors, stopping for review", job_id=state.job_id, error_count=error_count)
+            state["status"] = "needs_review"
+            logger.info("Validation found errors, stopping for review", job_id=state["job_id"], error_count=error_count)
         else:
-            logger.info("Validation passed, continuing to version", job_id=state.job_id)
+            logger.info("Validation passed, continuing to version", job_id=state["job_id"])
         
         if result.get("error"):
-            state.error = result["error"]
-            state.failed_agent = "validator"
-            state.status = "failed"
+            state["error"] = result["error"]
+            state["failed_agent"] = "validator"
+            state["status"] = "failed"
         
         return state
         
     except Exception as e:
-        logger.error("Validate node failed", job_id=state.job_id, error=str(e))
-        state.error = str(e)
-        state.failed_agent = "validate"
-        state.status = "failed"
+        logger.error("Validate node failed", job_id=state["job_id"], error=str(e))
+        state["error"] = str(e)
+        state["failed_agent"] = "validate"
+        state["status"] = "failed"
         return state
 
-def version_node(state: ProcessingState) -> ProcessingState:
+def version_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Version node - create new version with validated data."""
-    logger.info("Running version node", job_id=state.job_id)
+    logger.info("Running version node", job_id=state["job_id"])
     
     try:
         # Convert state to dict for agent compatibility
         agent_state = {
-            "job_id": state.job_id,
-            "processing_notes": state.processing_notes,
-            "validated_data": state.rows,
-            "validation_issues": state.issues
+            "job_id": state["job_id"],
+            "processing_notes": state.get("processing_notes", []),
+            "validated_data": state.get("rows", []),
+            "validation_issues": state.get("issues", [])
         }
         
         # Run versioner agent
@@ -329,74 +335,76 @@ def version_node(state: ProcessingState) -> ProcessingState:
         
         # Update state with version info
         version_info = result.get("version_info", {})
-        state.version_id = version_info.get("version_id")
-        state.processing_notes = result.get("processing_notes", [])
+        state["version_id"] = version_info.get("version_id")
+        state["processing_notes"] = result.get("processing_notes", [])
         
         if result.get("error"):
-            state.error = result["error"]
-            state.failed_agent = "versioner"
-            state.status = "failed"
+            state["error"] = result["error"]
+            state["failed_agent"] = "versioner"
+            state["status"] = "failed"
         
-        logger.info("Version node completed", job_id=state.job_id, version_id=state.version_id)
+        logger.info("Version node completed", job_id=state["job_id"], version_id=state.get("version_id"))
         return state
         
     except Exception as e:
-        logger.error("Version node failed", job_id=state.job_id, error=str(e))
-        state.error = str(e)
-        state.failed_agent = "version"
-        state.status = "failed"
+        logger.error("Version node failed", job_id=state["job_id"], error=str(e))
+        state["error"] = str(e)
+        state["failed_agent"] = "version"
+        state["status"] = "failed"
         return state
 
-def export_node(state: ProcessingState) -> ProcessingState:
+def export_node(state: Dict[str, Any]) -> Dict[str, Any]:
     """Export node - generate Excel export."""
-    logger.info("Running export node", job_id=state.job_id)
+    logger.info("Running export node", job_id=state["job_id"])
     
     try:
         # Convert state to dict for agent compatibility
         agent_state = {
-            "job_id": state.job_id,
-            "processing_notes": state.processing_notes,
-            "version_info": {"version_id": state.version_id},
-            "validated_data": state.rows
+            "job_id": state["job_id"],
+            "processing_notes": state.get("processing_notes", []),
+            "version_info": {"version_id": state.get("version_id")},
+            "validated_data": state.get("rows", [])
         }
         
         # Run exporter agent
         result = exporter_excel_run(agent_state)
         
         # Update state with export info
-        state.artifacts["excel_export"] = result.get("excel_export", {})
-        state.processing_notes = result.get("processing_notes", [])
-        state.status = "ready"
+        if "artifacts" not in state:
+            state["artifacts"] = {}
+        state["artifacts"]["excel_export"] = result.get("excel_export", {})
+        state["processing_notes"] = result.get("processing_notes", [])
+        state["status"] = "ready"
         
         if result.get("error"):
-            state.error = result["error"]
-            state.failed_agent = "exporter_excel"
-            state.status = "failed"
+            state["error"] = result["error"]
+            state["failed_agent"] = "exporter_excel"
+            state["status"] = "failed"
         
-        logger.info("Export node completed", job_id=state.job_id, status=state.status)
+        logger.info("Export node completed", job_id=state["job_id"], status=state["status"])
         return state
         
     except Exception as e:
-        logger.error("Export node failed", job_id=state.job_id, error=str(e))
-        state.error = str(e)
-        state.failed_agent = "export"
-        state.status = "failed"
+        logger.error("Export node failed", job_id=state["job_id"], error=str(e))
+        state["error"] = str(e)
+        state["failed_agent"] = "export"
+        state["status"] = "failed"
         return state
 
 # ============================================================================
 # CONDITIONAL EDGES
 # ============================================================================
 
-def should_use_vlm(state: ProcessingState) -> str:
+def should_use_vlm(state: Dict[str, Any]) -> str:
     """Determine if VLM assistance is needed."""
-    if state.needs_vlm or state.force_vlm_toggle:
+    if state.get("needs_vlm", False) or state.get("force_vlm_toggle", False):
         return "vlm_assist"
     else:
         return "normalize"
 
-def should_continue_after_validate(state: ProcessingState) -> str:
+def should_continue_after_validate(state: Dict[str, Any]) -> str:
     """Determine if processing should continue after validation."""
-    if state.status == "needs_review":
+    if state.get("status") == "needs_review":
         return END
     else:
         return "version"
@@ -479,8 +487,9 @@ def run_graph(job_id: int) -> Dict[str, Any]:
         # Create and run the graph
         workflow = create_processing_graph()
         
-        # Execute the graph
-        final_state = workflow.invoke(initial_state)
+        # Execute the graph with thread configuration
+        config = {"configurable": {"thread_id": f"job_{job_id}"}}
+        final_state = workflow.invoke(initial_state, config=config)
         
         # Persist results to database
         _persist_graph_results(final_state)
@@ -488,18 +497,18 @@ def run_graph(job_id: int) -> Dict[str, Any]:
         # Prepare result
         result = {
             "job_id": job_id,
-            "status": final_state.status,
-            "version_id": final_state.version_id,
-            "processing_time": time.time() - final_state.start_time,
-            "rows_processed": len(final_state.rows),
-            "issues_found": len(final_state.issues),
-            "vlm_used": final_state.vlm_used,
-            "processing_notes": final_state.processing_notes
+            "status": final_state["status"],
+            "version_id": final_state.get("version_id"),
+            "processing_time": time.time() - final_state["start_time"],
+            "rows_processed": len(final_state.get("rows", [])),
+            "issues_found": len(final_state.get("issues", [])),
+            "vlm_used": final_state.get("vlm_used", False),
+            "processing_notes": final_state.get("processing_notes", [])
         }
         
-        if final_state.error:
-            result["error"] = final_state.error
-            result["failed_agent"] = final_state.failed_agent
+        if final_state.get("error"):
+            result["error"] = final_state["error"]
+            result["failed_agent"] = final_state.get("failed_agent")
         
         logger.info("Graph execution completed", **result)
         return result
@@ -562,12 +571,12 @@ def resume_graph(job_id: int, version_id: int) -> Dict[str, Any]:
         # Prepare result
         result = {
             "job_id": job_id,
-            "status": final_state.status,
-            "version_id": final_state.version_id,
+            "status": final_state["status"],
+            "version_id": final_state.get("version_id"),
             "resumed": True,
-            "rows_processed": len(final_state.rows),
-            "issues_found": len(final_state.issues),
-            "processing_notes": final_state.processing_notes
+            "rows_processed": len(final_state.get("rows", [])),
+            "issues_found": len(final_state.get("issues", [])),
+            "processing_notes": final_state.get("processing_notes", [])
         }
         
         logger.info("Graph resume completed", **result)
@@ -582,42 +591,42 @@ def resume_graph(job_id: int, version_id: int) -> Dict[str, Any]:
             "resumed": True
         }
 
-def _persist_graph_results(state: ProcessingState) -> None:
+def _persist_graph_results(state: Dict[str, Any]) -> None:
     """Persist graph results to database."""
     try:
         with get_db_session() as db:
-            job = db.query(Job).filter(Job.id == state.job_id).first()
+            job = db.query(Job).filter(Job.id == state["job_id"]).first()
             if not job:
                 return
             
             # Update job status
-            job.status = JobStatus.READY if state.status == "ready" else JobStatus.NEEDS_REVIEW if state.status == "needs_review" else JobStatus.FAILED
+            job.status = JobStatus.READY.value if state["status"] == "ready" else JobStatus.NEEDS_REVIEW.value if state["status"] == "needs_review" else JobStatus.FAILED.value
             
             # Create version if not exists
-            if not state.version_id:
+            if not state.get("version_id"):
                 version = Version(
-                    job_id=state.job_id,
+                    job_id=state["job_id"],
                     author="system",
                     reason="LangGraph orchestrated processing"
                 )
                 db.add(version)
                 db.flush()
-                state.version_id = version.id
+                state["version_id"] = version.id
             
             # Store records
-            for row in state.rows:
+            for row in state.get("rows", []):
                 record = Record(
-                    job_id=state.job_id,
-                    version_id=state.version_id,
+                    job_id=state["job_id"],
+                    version_id=state["version_id"],
                     row_idx=row["row_idx"],
                     payload_json=row["data"]
                 )
                 db.add(record)
             
             # Store issues
-            for issue in state.issues:
+            for issue in state.get("issues", []):
                 issue_record = Issue(
-                    version_id=state.version_id,
+                    version_id=state["version_id"],
                     row_idx=issue.get("row_idx"),
                     field=issue.get("field"),
                     level=issue["level"],
@@ -626,10 +635,10 @@ def _persist_graph_results(state: ProcessingState) -> None:
                 db.add(issue_record)
             
             # Update job current version
-            job.current_version_id = state.version_id
+            job.current_version_id = state["version_id"]
             
             db.commit()
             
     except Exception as e:
-        logger.error("Failed to persist graph results", job_id=state.job_id, error=str(e))
+        logger.error("Failed to persist graph results", job_id=state["job_id"], error=str(e))
         raise

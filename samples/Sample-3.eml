@@ -1,0 +1,132 @@
+Received: from PH0PR15MB5686.namprd15.prod.outlook.com (2603:10b6:510:289::10)
+ by PH3PPF362B23CA1.namprd15.prod.outlook.com with HTTPS; Mon, 1 Sep 2025
+ 14:02:23 +0000
+Received: from PH3PPF362B23CA1.namprd15.prod.outlook.com
+ (2603:10b6:518:1::494) by PH0PR15MB5686.namprd15.prod.outlook.com
+ (2603:10b6:510:289::10) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9073.26; Mon, 1 Sep
+ 2025 14:02:22 +0000
+Received: from PH3PPF362B23CA1.namprd15.prod.outlook.com
+ ([fe80::70eb:e1bb:3baf:989d]) by PH3PPF362B23CA1.namprd15.prod.outlook.com
+ ([fe80::70eb:e1bb:3baf:989d%7]) with mapi id 15.20.9052.017; Mon, 1 Sep 2025
+ 14:02:22 +0000
+From: Prajay Sapkale <prajay.sapkale@hilabs.com>
+To: Prajay Sapkale <prajay.sapkale@hilabs.com>
+Subject: Sample-3
+Thread-Topic: Sample-3
+Thread-Index: AdwbSOgdpu2FJF0AQWCC4m5Az4C8Fg==
+Date: Mon, 1 Sep 2025 14:02:22 +0000
+Message-ID:
+	<PH3PPF362B23CA10FFE025C6A8979D41ADCF607A@PH3PPF362B23CA1.namprd15.prod.outlook.com>
+Accept-Language: en-GB, en-US
+Content-Language: en-US
+X-MS-Exchange-Organization-AuthAs: Internal
+X-MS-Exchange-Organization-AuthMechanism: 04
+X-MS-Exchange-Organization-AuthSource:
+	PH3PPF362B23CA1.namprd15.prod.outlook.com
+X-MS-Has-Attach:
+X-MS-Exchange-Organization-Network-Message-Id:
+	f62910a7-3caa-49ee-b29a-08dde9602c30
+X-MS-Exchange-Organization-SCL: 1
+X-MS-TNEF-Correlator:
+X-MS-Exchange-Organization-RecordReviewCfmType: 0
+x-ms-publictraffictype: Email
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=hilabs.com;
+x-ms-office365-filtering-correlation-id: f62910a7-3caa-49ee-b29a-08dde9602c30
+x-ms-traffictypediagnostic:
+	PH3PPF362B23CA1:EE_|PH0PR15MB5686:EE_|PH3PPF362B23CA1:EE_
+x-microsoft-antispam: BCL:0;ARA:13230040|366016|8096899003|41050700001;
+x-forefront-antispam-report:
+	CIP:255.255.255.255;CTRY:;LANG:en;SCL:1;SRV:;IPV:NLI;SFV:NSPM;H:PH3PPF362B23CA1.namprd15.prod.outlook.com;PTR:;CAT:NONE;SFS:(13230040)(366016)(8096899003)(41050700001);DIR:INT;
+x-ms-exchange-crosstenant-authas: Internal
+x-ms-exchange-crosstenant-authsource:
+	PH3PPF362B23CA1.namprd15.prod.outlook.com
+x-ms-exchange-crosstenant-network-message-id:
+	f62910a7-3caa-49ee-b29a-08dde9602c30
+x-ms-exchange-crosstenant-originalarrivaltime: 01 Sep 2025 14:02:22.3850 (UTC)
+x-ms-exchange-crosstenant-fromentityheader: Hosted
+x-ms-exchange-crosstenant-id: 00f78908-dfdd-4541-b78e-c377d4dbe6e2
+x-ms-exchange-transport-crosstenantheadersstamped: PH0PR15MB5686
+x-ms-exchange-transport-endtoendlatency: 00:00:00.7270634
+x-ms-exchange-processed-by-bccfoldering: 15.20.9052.000
+x-ms-exchange-crosstenant-mailboxtype: HOSTED
+x-ms-exchange-crosstenant-userprincipalname:
+	fAqVWEjl44Zv6TphpBb92ILaACYos0mmfVN6gpp1jJNbCoUnfKEqFcKUGav5w28B56ETiftikGAt+f+553vkOg==
+X-Microsoft-Antispam-Mailbox-Delivery:
+	ucf:0;jmr:0;auth:0;dest:I;ENG:(910005)(944506478)(944626604)(920097)(425001)(930097)(140003);
+X-Microsoft-Antispam-Message-Info:
+	pYk6bChhWcpwRyG0rLeqxmfvzeE5y9naOuz3qQL/f4zdxNXJibWsOip22TIfLUk0FAKcxPANBu6muozDedBsaB0MOHAr5ZqasyHcaRf/7ySMDWJVTUj4OUCwio4K3xJrR54m993D3q4hc8VUgX8he+zsGKjAUZLhorHAkfgcTNYLnbZhPSnbYS2lMAvZk7tzKC1DuyQzOYyVjC8+iBqsOKzUOyfWDP5iHLZMJnQIGN4TWBNaGK8jljl0ExkXLNDQ6J02HP2G+Nz2Qe3gdQfUPTs6pjfSQAKLnCFfgb35GGZ8EFs7GBs8yxdR188ijAgN/jPqSGsdKfARR0T7PJNfR50vsvxr4doE+iXkUglZ6yvYe2E3+GkRQcdDY79WxlvjFay4KQec0w/4BnFfkT3wonmu/x02yWrq/jbhQxNH+n0fOjz4Jb8NY3CrFmpB+GhOab+2GhvsTQWLZMur9ta/chDydbdkF2FN+J01vMwvwSGyZ5L9HApPV43HM46MbyA1+JEGInfxqJuZQ9rFIZcji8xbWn0EauFHF+x9b6xFIFNGSloTaxs3fWIQf7ev7WeSSHt52LOQVjYg+3/x0sknwh9p3HRX3zwkCCdzeWkyHkYJxfkaUCIkfqG9rTGI2xNN9lPDeMzQogAlHMz1Wv1+CZXkHIyOgEiv/uj0Dn9GJ2udKjPNJIVhMT+KuQZXdd0rmzamZsUbaOkfxQTceFrrMbxvJc0CtBzeLCAfJue9gdsy19gaK79pMeAMLL6xV/Az8nMeYcMLJ9qc/YKm9cMOt1uD4sgwumBhXO0SDtGBk6I=
+Content-Type: multipart/alternative;
+	boundary="_000_PH3PPF362B23CA10FFE025C6A8979D41ADCF607APH3PPF362B23CA1_"
+MIME-Version: 1.0
+
+--_000_PH3PPF362B23CA10FFE025C6A8979D41ADCF607APH3PPF362B23CA1_
+Content-Type: text/plain; charset="us-ascii"
+
+Hello,
+Effective 09/22/2025, Paul Mcmallan, MD will move primary practice locations from Mira Mesa to Sorrento Mesa.
+
+
+Best Regards
+Prajay
+
+--_000_PH3PPF362B23CA10FFE025C6A8979D41ADCF607APH3PPF362B23CA1_
+Content-Type: text/html; charset="us-ascii"
+
+<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:m="http://schemas.microsoft.com/office/2004/12/omml" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+<meta name="Generator" content="Microsoft Word 15 (filtered medium)">
+<style><!--
+/* Font Definitions */
+@font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;}
+@font-face
+	{font-family:Aptos;}
+/* Style Definitions */
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin:0cm;
+	font-size:11.0pt;
+	font-family:"Aptos",sans-serif;
+	mso-ligatures:standardcontextual;
+	mso-fareast-language:EN-US;}
+span.EmailStyle17
+	{mso-style-type:personal-compose;
+	font-family:"Aptos",sans-serif;
+	color:windowtext;}
+.MsoChpDefault
+	{mso-style-type:export-only;
+	font-size:11.0pt;
+	mso-fareast-language:EN-US;}
+@page WordSection1
+	{size:612.0pt 792.0pt;
+	margin:72.0pt 72.0pt 72.0pt 72.0pt;}
+div.WordSection1
+	{page:WordSection1;}
+--></style><!--[if gte mso 9]><xml>
+<o:shapedefaults v:ext="edit" spidmax="1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+<o:shapelayout v:ext="edit">
+<o:idmap v:ext="edit" data="1" />
+</o:shapelayout></xml><![endif]-->
+</head>
+<body lang="EN-IN" link="#467886" vlink="#96607D" style="word-wrap:break-word">
+<div class="WordSection1">
+<p class="MsoNormal"><span lang="EN-US">Hello,<o:p></o:p></span></p>
+<p class="MsoNormal"><span lang="EN-US">Effective 09/22/2025, Paul Mcmallan, MD will move primary practice locations from Mira Mesa to Sorrento Mesa.<o:p></o:p></span></p>
+<p class="MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class="MsoNormal"><o:p>&nbsp;</o:p></p>
+<div>
+<p class="MsoNormal"><span style="font-size:12.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:black;mso-ligatures:none;mso-fareast-language:EN-IN">Best Regards</span><span style="font-size:12.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:black;mso-ligatures:none;mso-fareast-language:EN-IN"><o:p></o:p></span></p>
+</div>
+<p class="MsoNormal"><span style="font-size:12.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:black;mso-ligatures:none;mso-fareast-language:EN-IN">Prajay</span><o:p></o:p></p>
+</div>
+</body>
+</html>
+
+--_000_PH3PPF362B23CA10FFE025C6A8979D41ADCF607APH3PPF362B23CA1_--

@@ -14,10 +14,10 @@ from typing import Dict, Any, List
 
 from ..config import settings
 from ..storage import storage_client
-from ..metrics import track_agent_metrics, track_vlm_invocation, get_logger
+from ..metrics import get_agent_runs_total, get_agent_latency_seconds, get_vlm_invocations_total
+import structlog
 
-logger = get_logger(__name__)
-@track_agent_metrics("vlm_client")
+logger = structlog.get_logger(__name__)
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Process documents using Vision Language Model.
@@ -35,7 +35,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     
     try:
         # Increment run counter
-        AGENT_RUNS_TOTAL.labels(agent=agent_name).inc()
+        get_agent_runs_total().labels(agent=agent_name).inc()
         
         # Check if VLM is enabled and required
         if not settings.vlm_enabled:
@@ -99,7 +99,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
                     vlm_metadata["total_processing_time"] += result["processing_time"]
                     
                     # Track VLM invocation
-                    track_vlm_invocation(result.get("method", "unknown"), "success")
+                    get_vlm_invocations_total().labels(model=result.get("method", "unknown"), status="success").inc()
                 else:
                     vlm_metadata["failed_extractions"] += 1
                     
@@ -154,7 +154,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     finally:
         # Record latency
         duration = time.time() - start_time
-        AGENT_LATENCY_SECONDS.labels(agent=agent_name).observe(duration)
+        get_agent_latency_seconds().labels(agent=agent_name).observe(duration)
 
 def _process_vlm_input(vlm_input: Dict[str, Any], schema: List[str]) -> Dict[str, Any]:
     """Process a single VLM input (page image or PDF)."""

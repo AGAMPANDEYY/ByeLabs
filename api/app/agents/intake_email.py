@@ -10,26 +10,21 @@ This agent handles the initial email processing:
 
 import time
 import email
+import email.policy
 import mimetypes
 import uuid
 from typing import Dict, Any, List
 from io import BytesIO
-from prometheus_client import Counter, Histogram
+from ..metrics import get_agent_runs_total, get_agent_latency_seconds
 import structlog
 
 from ..db import get_db_session
-from ..models import Email
+from ..models import Email, Job
 from ..storage import storage_client, calculate_checksum, generate_object_key
 
 logger = structlog.get_logger(__name__)
 
-# Prometheus metrics
-AGENT_RUNS_TOTAL = Counter(
-    "agent_runs_total", "Total agent runs", ["agent"]
-)
-AGENT_LATENCY_SECONDS = Histogram(
-    "agent_latency_seconds", "Agent execution latency", ["agent"]
-)
+# Metrics are now imported from metrics module
 
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -48,7 +43,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     
     try:
         # Increment run counter
-        AGENT_RUNS_TOTAL.labels(agent=agent_name).inc()
+        get_agent_runs_total().labels(agent=agent_name, status="started").inc()
         
         job_id = state.get("job_id")
         if not job_id:
@@ -63,10 +58,18 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
             email_record = job.email
             if not email_record:
                 raise ValueError(f"Email record not found for job {job_id}")
+            
+            # Get all needed data while still in session
+            raw_uri = email_record.raw_uri
+            message_id = email_record.message_id
+            from_addr = email_record.from_addr
+            to_addr = email_record.to_addr
+            subject = email_record.subject
+            received_at = email_record.received_at
         
         # Get raw email content from MinIO
         try:
-            raw_content = storage_client.get_bytes(email_record.raw_uri.split('/', 1)[1])
+            raw_content = storage_client.get_bytes(raw_uri.split('/', 1)[1])
         except Exception as e:
             raise Exception(f"Failed to retrieve raw email: {e}")
         
@@ -96,11 +99,11 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
             },
             "attachments": attachments,
             "email_metadata": {
-                "message_id": email_record.message_id,
-                "from_addr": email_record.from_addr,
-                "to_addr": email_record.to_addr,
-                "subject": email_record.subject,
-                "received_at": email_record.received_at.isoformat()
+                "message_id": message_id,
+                "from_addr": from_addr,
+                "to_addr": to_addr,
+                "subject": subject,
+                "received_at": received_at.isoformat() if received_at else None
             }
         }
         
@@ -134,7 +137,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     finally:
         # Record latency
         duration = time.time() - start_time
-        AGENT_LATENCY_SECONDS.labels(agent=agent_name).observe(duration)
+        get_agent_latency_seconds().labels(agent=agent_name).observe(duration)
 
 def _extract_email_body(email_message) -> Dict[str, str]:
     """Extract text and HTML body from email message."""

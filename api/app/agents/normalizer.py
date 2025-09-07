@@ -17,10 +17,11 @@ import dateparser
 import usaddress
 from datetime import datetime
 
-from ..metrics import track_agent_metrics, get_logger
+from ..metrics import get_agent_runs_total, get_agent_latency_seconds
 from ..llm import get_llm_client
+import structlog
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Excel Schema - 17 fields for roster data
 EXCEL_SCHEMA = [
@@ -43,7 +44,6 @@ EXCEL_SCHEMA = [
     "Notes"
 ]
 
-@track_agent_metrics("normalizer")
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Normalize extracted data to the exact Excel schema (17 fields).

@@ -1,0 +1,328 @@
+Received: from CH3PR15MB6394.namprd15.prod.outlook.com (2603:10b6:610:1b6::15)
+ by PH3PPF362B23CA1.namprd15.prod.outlook.com with HTTPS; Mon, 1 Sep 2025
+ 14:07:18 +0000
+Received: from PH3PPF362B23CA1.namprd15.prod.outlook.com
+ (2603:10b6:518:1::494) by CH3PR15MB6394.namprd15.prod.outlook.com
+ (2603:10b6:610:1b6::15) with Microsoft SMTP Server (version=TLS1_2,
+ cipher=TLS_ECDHE_RSA_WITH_AES_256_GCM_SHA384) id 15.20.9073.21; Mon, 1 Sep
+ 2025 14:07:16 +0000
+Received: from PH3PPF362B23CA1.namprd15.prod.outlook.com
+ ([fe80::70eb:e1bb:3baf:989d]) by PH3PPF362B23CA1.namprd15.prod.outlook.com
+ ([fe80::70eb:e1bb:3baf:989d%7]) with mapi id 15.20.9052.017; Mon, 1 Sep 2025
+ 14:07:15 +0000
+From: Prajay Sapkale <prajay.sapkale@hilabs.com>
+To: Prajay Sapkale <prajay.sapkale@hilabs.com>
+Subject: Sample-2  
+Thread-Topic: Sample-2  
+Thread-Index: AdwbSbRXRuKGuaXJTYGlGF4vsA5kSw==
+Date: Mon, 1 Sep 2025 14:07:15 +0000
+Message-ID:
+	<PH3PPF362B23CA1631FB60B4F6DC354D15DF607A@PH3PPF362B23CA1.namprd15.prod.outlook.com>
+Accept-Language: en-GB, en-US
+Content-Language: en-US
+X-MS-Exchange-Organization-AuthAs: Internal
+X-MS-Exchange-Organization-AuthMechanism: 04
+X-MS-Exchange-Organization-AuthSource:
+	PH3PPF362B23CA1.namprd15.prod.outlook.com
+X-MS-Has-Attach:
+X-MS-Exchange-Organization-Network-Message-Id:
+	ef600841-45f6-4a80-b70f-08dde960db12
+X-MS-Exchange-Organization-SCL: 1
+X-MS-TNEF-Correlator:
+X-MS-Exchange-Organization-RecordReviewCfmType: 0
+x-ms-publictraffictype: Email
+authentication-results: dkim=none (message not signed)
+ header.d=none;dmarc=none action=none header.from=hilabs.com;
+x-ms-office365-filtering-correlation-id: ef600841-45f6-4a80-b70f-08dde960db12
+x-ms-traffictypediagnostic:
+	PH3PPF362B23CA1:EE_|CH3PR15MB6394:EE_|PH3PPF362B23CA1:EE_
+x-microsoft-antispam: BCL:0;ARA:13230040|366016|8096899003|41050700001;
+x-forefront-antispam-report:
+	CIP:255.255.255.255;CTRY:;LANG:en;SCL:1;SRV:;IPV:NLI;SFV:NSPM;H:PH3PPF362B23CA1.namprd15.prod.outlook.com;PTR:;CAT:NONE;SFS:(13230040)(366016)(8096899003)(41050700001);DIR:INT;
+x-ms-exchange-crosstenant-authas: Internal
+x-ms-exchange-crosstenant-authsource:
+	PH3PPF362B23CA1.namprd15.prod.outlook.com
+x-ms-exchange-crosstenant-network-message-id:
+	ef600841-45f6-4a80-b70f-08dde960db12
+x-ms-exchange-crosstenant-originalarrivaltime: 01 Sep 2025 14:07:15.7526 (UTC)
+x-ms-exchange-crosstenant-fromentityheader: Hosted
+x-ms-exchange-crosstenant-id: 00f78908-dfdd-4541-b78e-c377d4dbe6e2
+x-ms-exchange-transport-crosstenantheadersstamped: CH3PR15MB6394
+x-ms-exchange-transport-endtoendlatency: 00:00:02.8987489
+x-ms-exchange-processed-by-bccfoldering: 15.20.9052.000
+x-ms-exchange-crosstenant-mailboxtype: HOSTED
+x-ms-exchange-crosstenant-userprincipalname:
+	cSJJEGgXuuPdufvxKj8H70LireRmUMl++EOKtEL5JrKsuPfOO1mnFnJ4bVIqoMvHUjVBLUbnG4hknhIwBwEesQ==
+X-Microsoft-Antispam-Mailbox-Delivery:
+	ucf:0;jmr:0;auth:0;dest:I;ENG:(910005)(944506478)(944626604)(920097)(425001)(930097)(140003);
+X-Microsoft-Antispam-Message-Info:
+	SW//GZL73Q3NPoO7xpTB1z0J5TFGS6BHAWbgtcm4NzbznRHM40iKfAS+0dQ/ZVXDsC4BguuCcl1yM33enSIbd76V0x7iO0wSy05jzvs/47CTLL6NxMF37ExXp0wT3GvPvEWap08sBrOnuIhX7pcWoVp1MeqITYO0/3QpEKUBbSubK8fSWySWd73abc8mKtLZ2kW4wcoY7ebf7s70E6idtoyqg7CYRgG/DdhsrttX9sx9jPqoISwnWMmVlHH2nFM0hQ3oCmnOqdZlXbw3OW3I13+haSzVLrrifQbUvxSkkzK32J606N+D6jH+l08pLVNB0Y2uquRRQFGo7Ipq6FgkMrxacgv6qJo13SHMYwb8cFPI9v3IQ33BAdHNdzXGZhYE8uq4e13Qp7EgheyduJZxwfjG8xNpVB+LBpdKSLfdp10BZUXTGYnj3aY+LzKIdA3iIULU37dxYn7A1UKIfptDfP5FnRs5tCGThWLwjAmZp30QjXcQ9kZVzZCn6yxYqkD1TBQRm5oedb/zpfisN8SIYXtTzqu/MDm/QfB7IHqJ2xWUxuaT6df7hd+XpHjuasZRzB65pEPz1MOTNGbtyYeveomfBrgaIl4U45lEXBoj4AD1t9N0mc9VbU8Fn7xVH3G45zjs7FUdD7hcWbPRQVTrNL/RADlIMDe7WWOxQ+lwTpN20JlfWQJpbvjg9e3xzaSyNkVpFRbKQ+WlWFXtShwRqG13Bd0jpJL4gv91v/BQnwvRm1CchVTBbl2iRnwyHEm1ve+xTT4xXmUS4DTukuau/eHUv7Zgi/PQRPb17lbmxd0=
+Content-Type: multipart/alternative;
+	boundary="_000_PH3PPF362B23CA1631FB60B4F6DC354D15DF607APH3PPF362B23CA1_"
+MIME-Version: 1.0
+
+--_000_PH3PPF362B23CA1631FB60B4F6DC354D15DF607APH3PPF362B23CA1_
+Content-Type: text/plain; charset="us-ascii"
+
+Hi
+
+Please " Terminate" the provider under Medical Group affiliation "Cyrus Hendricks, M.D.." Tax ID: 45-8888885.
+Effective Date: 9/1/2025 (Or closest accepted date)
+Provider: Cyrus Hendricks, M.D / License: D66661 / NPI: 1164444443 / Internal Medicine 207R00000X
+**Default Provider: Spen Hoostal, MD / License: A155559 / NPI: 1999999997 / Internal Medicine 207R00000X
+Network(s): PPG#'s / Medicare
+Shared Risk:
+
+  *   Mercian Medical Group - 1014
+Network(s): PPG#'s / Commercial HMO
+Shared Risk:
+
+  *   Mercian Medical Group - 0P4
+
+
+Best Regards
+Prajay
+
+--_000_PH3PPF362B23CA1631FB60B4F6DC354D15DF607APH3PPF362B23CA1_
+Content-Type: text/html; charset="us-ascii"
+
+<html xmlns:v="urn:schemas-microsoft-com:vml" xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns:m="http://schemas.microsoft.com/office/2004/12/omml" xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=us-ascii">
+<meta name="Generator" content="Microsoft Word 15 (filtered medium)">
+<style><!--
+/* Font Definitions */
+@font-face
+	{font-family:Wingdings;
+	panose-1:5 0 0 0 0 0 0 0 0 0;}
+@font-face
+	{font-family:"Cambria Math";
+	panose-1:2 4 5 3 5 4 6 3 2 4;}
+@font-face
+	{font-family:Calibri;
+	panose-1:2 15 5 2 2 2 4 3 2 4;}
+@font-face
+	{font-family:Aptos;}
+/* Style Definitions */
+p.MsoNormal, li.MsoNormal, div.MsoNormal
+	{margin:0cm;
+	font-size:11.0pt;
+	font-family:"Aptos",sans-serif;
+	mso-ligatures:standardcontextual;
+	mso-fareast-language:EN-US;}
+span.EmailStyle17
+	{mso-style-type:personal-compose;
+	font-family:"Aptos",sans-serif;
+	color:windowtext;}
+span.Style1
+	{mso-style-name:Style1;
+	mso-style-priority:1;
+	font-family:"Times New Roman",serif;
+	font-weight:bold;
+	text-decoration:underline;}
+.MsoChpDefault
+	{mso-style-type:export-only;
+	font-size:11.0pt;
+	mso-fareast-language:EN-US;}
+@page WordSection1
+	{size:612.0pt 792.0pt;
+	margin:72.0pt 72.0pt 72.0pt 72.0pt;}
+div.WordSection1
+	{page:WordSection1;}
+/* List Definitions */
+@list l0
+	{mso-list-id:96875701;
+	mso-list-type:hybrid;
+	mso-list-template-ids:-1708478058 67698689 67698691 67698693 67698689 67698691 67698693 67698689 67698691 67698693;}
+@list l0:level1
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0B7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:54.0pt;
+	text-indent:-18.0pt;
+	font-family:Symbol;}
+@list l0:level2
+	{mso-level-number-format:bullet;
+	mso-level-text:o;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:90.0pt;
+	text-indent:-18.0pt;
+	font-family:"Courier New";}
+@list l0:level3
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0A7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:126.0pt;
+	text-indent:-18.0pt;
+	font-family:Wingdings;}
+@list l0:level4
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0B7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:162.0pt;
+	text-indent:-18.0pt;
+	font-family:Symbol;}
+@list l0:level5
+	{mso-level-number-format:bullet;
+	mso-level-text:o;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:198.0pt;
+	text-indent:-18.0pt;
+	font-family:"Courier New";}
+@list l0:level6
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0A7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:234.0pt;
+	text-indent:-18.0pt;
+	font-family:Wingdings;}
+@list l0:level7
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0B7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:270.0pt;
+	text-indent:-18.0pt;
+	font-family:Symbol;}
+@list l0:level8
+	{mso-level-number-format:bullet;
+	mso-level-text:o;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:306.0pt;
+	text-indent:-18.0pt;
+	font-family:"Courier New";}
+@list l0:level9
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0A7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:342.0pt;
+	text-indent:-18.0pt;
+	font-family:Wingdings;}
+@list l1
+	{mso-list-id:580871178;
+	mso-list-type:hybrid;
+	mso-list-template-ids:633371150 67698689 67698691 67698693 67698689 67698691 67698693 67698689 67698691 67698693;}
+@list l1:level1
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0B7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:54.0pt;
+	text-indent:-18.0pt;
+	font-family:Symbol;}
+@list l1:level2
+	{mso-level-number-format:bullet;
+	mso-level-text:o;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:90.0pt;
+	text-indent:-18.0pt;
+	font-family:"Courier New";}
+@list l1:level3
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0A7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:126.0pt;
+	text-indent:-18.0pt;
+	font-family:Wingdings;}
+@list l1:level4
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0B7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:162.0pt;
+	text-indent:-18.0pt;
+	font-family:Symbol;}
+@list l1:level5
+	{mso-level-number-format:bullet;
+	mso-level-text:o;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:198.0pt;
+	text-indent:-18.0pt;
+	font-family:"Courier New";}
+@list l1:level6
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0A7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:234.0pt;
+	text-indent:-18.0pt;
+	font-family:Wingdings;}
+@list l1:level7
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0B7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:270.0pt;
+	text-indent:-18.0pt;
+	font-family:Symbol;}
+@list l1:level8
+	{mso-level-number-format:bullet;
+	mso-level-text:o;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:306.0pt;
+	text-indent:-18.0pt;
+	font-family:"Courier New";}
+@list l1:level9
+	{mso-level-number-format:bullet;
+	mso-level-text:\F0A7;
+	mso-level-tab-stop:none;
+	mso-level-number-position:left;
+	margin-left:342.0pt;
+	text-indent:-18.0pt;
+	font-family:Wingdings;}
+ol
+	{margin-bottom:0cm;}
+ul
+	{margin-bottom:0cm;}
+--></style><!--[if gte mso 9]><xml>
+<o:shapedefaults v:ext="edit" spidmax="1026" />
+</xml><![endif]--><!--[if gte mso 9]><xml>
+<o:shapelayout v:ext="edit">
+<o:idmap v:ext="edit" data="1" />
+</o:shapelayout></xml><![endif]-->
+</head>
+<body lang="EN-IN" link="#467886" vlink="#96607D" style="word-wrap:break-word">
+<div class="WordSection1">
+<p class="MsoNormal">Hi<o:p></o:p></p>
+<p class="MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class="MsoNormal"><span lang="EN-US">Please &#8220;</span><span class="Style1"><span lang="EN-US"> Terminate</span></span><span lang="EN-US">&#8221; the provider under Medical Group affiliation &#8220;<b>Cyrus Hendricks, M.D.</b>.&#8221; Tax ID:
+<b>45-8888885</b>.<o:p></o:p></span></p>
+<p class="MsoNormal"><span lang="EN-US">Effective Date: <b>9/1/2025</b> (Or closest accepted date)<o:p></o:p></span></p>
+<p class="MsoNormal"><span lang="EN-US">Provider: <b>Cyrus Hendricks, M.D</b></span><span class="Style1"><span lang="EN-US">
+</span></span><span lang="EN-US">/ License: <b>D66661</b> / NPI: <b>1164444443</b> /
+<b>Internal Medicine 207R00000X</b><o:p></o:p></span></p>
+<p class="MsoNormal"><span lang="EN-US">**Default Provider: Spen Hoostal, MD / License: A155559 / NPI: 1999999997 / Internal Medicine 207R00000X<o:p></o:p></span></p>
+<p class="MsoNormal"><b><u><span lang="EN-US">Network(s): PPG#&#8217;s / Medicare</span></u></b><span lang="EN-US"><o:p></o:p></span></p>
+<p class="MsoNormal"><b><u><span lang="EN-US">Shared Risk:</span></u></b><span lang="EN-US"><o:p></o:p></span></p>
+<ul style="margin-top:0cm" type="disc">
+<li class="MsoNormal" style="color:#002060;margin-left:18.0pt;mso-list:l0 level1 lfo1">
+<span lang="EN-US">Mercian Medical Group - 1014<o:p></o:p></span></li></ul>
+<p class="MsoNormal"><b><u><span lang="EN-US">Network(s): PPG#&#8217;s / Commercial HMO
+</span></u></b><span lang="EN-US"><o:p></o:p></span></p>
+<p class="MsoNormal"><b><u><span lang="EN-US">Shared Risk:</span></u></b><span lang="EN-US"><o:p></o:p></span></p>
+<ul style="margin-top:0cm" type="disc">
+<li class="MsoNormal" style="color:#002060;margin-left:18.0pt;mso-list:l1 level1 lfo2">
+<span lang="EN-US">Mercian Medical Group &#8211; 0P4<o:p></o:p></span></li></ul>
+<p class="MsoNormal"><o:p>&nbsp;</o:p></p>
+<p class="MsoNormal"><o:p>&nbsp;</o:p></p>
+<div>
+<p class="MsoNormal"><span style="font-size:12.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:black;mso-ligatures:none;mso-fareast-language:EN-IN">Best Regards</span><span style="font-size:12.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:black;mso-ligatures:none;mso-fareast-language:EN-IN"><o:p></o:p></span></p>
+</div>
+<p class="MsoNormal"><span style="font-size:12.0pt;font-family:&quot;Calibri&quot;,sans-serif;color:black;mso-ligatures:none;mso-fareast-language:EN-IN">Prajay</span><o:p></o:p></p>
+</div>
+</body>
+</html>
+
+--_000_PH3PPF362B23CA1631FB60B4F6DC354D15DF607APH3PPF362B23CA1_--

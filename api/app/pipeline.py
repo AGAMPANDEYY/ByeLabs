@@ -13,13 +13,13 @@ from .celery_app import celery_app
 from .db import get_db_session
 from .models import Job, Version, Record, Issue, Export, JobStatus, IssueLevel
 from .storage import storage_client, calculate_checksum, generate_object_key
-from .orchestrator import run_graph, resume_graph
-from .metrics import track_pipeline_metrics, get_logger
+from .simple_pipeline import process_job_simple, resume_job_simple
+from .metrics import get_agent_runs_total, get_agent_latency_seconds
+import structlog
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
 @celery_app.task(bind=True, name="app.pipeline.process_job")
-@track_pipeline_metrics()
 def process_job(self, job_id: int):
     """
     Process a job through the multi-agent pipeline.
@@ -48,7 +48,7 @@ def process_job(self, job_id: int):
     
     try:
         # Increment pipeline run counter
-        PIPELINE_RUNS_TOTAL.labels(status="started").inc()
+        get_agent_runs_total().labels(agent="pipeline", status="started").inc()
         
         # Initialize processing state
         state = {
@@ -64,20 +64,20 @@ def process_job(self, job_id: int):
             if not job:
                 raise ValueError(f"Job {job_id} not found")
             
-            job.status = JobStatus.PROCESSING
+            job.status = JobStatus.PROCESSING.value
             db.commit()
         
-        # Run the LangGraph orchestrator
-        result = run_graph(job_id)
+        # Run the simple pipeline
+        result = process_job_simple(job_id)
         
         # Calculate processing time
         processing_time = time.time() - start_time
         result["processing_time"] = processing_time
         
-        logger.info("Job processing pipeline completed", job_id=job_id, **result)
+        logger.info("Job processing pipeline completed", **result)
         
         # Increment success counter
-        PIPELINE_RUNS_TOTAL.labels(status="completed").inc()
+        get_agent_runs_total().labels(agent="pipeline", status="completed").inc()
         
         return result
         
@@ -87,7 +87,7 @@ def process_job(self, job_id: int):
             with get_db_session() as db:
                 job = db.query(Job).filter(Job.id == job_id).first()
                 if job:
-                    job.status = JobStatus.FAILED
+                    job.status = JobStatus.FAILED.value
                     db.commit()
         except Exception as db_error:
             logger.error("Failed to update job status", job_id=job_id, error=str(db_error))
@@ -98,14 +98,14 @@ def process_job(self, job_id: int):
         logger.error("Job processing pipeline failed", job_id=job_id, error=str(e), processing_time=processing_time)
         
         # Increment failure counter
-        PIPELINE_RUNS_TOTAL.labels(status="failed").inc()
+        get_agent_runs_total().labels(agent="pipeline", status="failed").inc()
         
         raise Exception(f"Job processing failed: {str(e)}")
         
     finally:
         # Record pipeline latency
         duration = time.time() - start_time
-        PIPELINE_LATENCY_SECONDS.observe(duration)
+        get_agent_latency_seconds().labels(agent="pipeline").observe(duration)
 
 @celery_app.task(name="app.pipeline.cleanup_old_jobs")
 def cleanup_old_jobs():
@@ -124,7 +124,7 @@ def cleanup_old_jobs():
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=30)
             
             old_jobs = db.query(Job).filter(
-                Job.status.in_([JobStatus.READY, JobStatus.FAILED]),
+                Job.status.in_([JobStatus.READY.value, JobStatus.FAILED.value]),
                 Job.updated_at < cutoff_date
             ).all()
             
@@ -175,20 +175,20 @@ def resume_job(self, job_id: int, version_id: int):
             if not job:
                 raise ValueError(f"Job {job_id} not found")
             
-            job.status = JobStatus.PROCESSING
+            job.status = JobStatus.PROCESSING.value
             db.commit()
         
-        # Resume the LangGraph orchestrator
-        result = resume_graph(job_id, version_id)
+        # Resume the simple pipeline
+        result = resume_job_simple(job_id, "validate")
         
         # Calculate processing time
         processing_time = time.time() - start_time
         result["processing_time"] = processing_time
         
-        logger.info("Job resume completed", job_id=job_id, **result)
+        logger.info("Job resume completed", **result)
         
         # Increment success counter
-        PIPELINE_RUNS_TOTAL.labels(status="resumed").inc()
+        get_agent_runs_total().labels(agent="pipeline", status="resumed").inc()
         
         return result
         
@@ -198,7 +198,7 @@ def resume_job(self, job_id: int, version_id: int):
             with get_db_session() as db:
                 job = db.query(Job).filter(Job.id == job_id).first()
                 if job:
-                    job.status = JobStatus.FAILED
+                    job.status = JobStatus.FAILED.value
                     db.commit()
         except Exception as db_error:
             logger.error("Failed to update job status", job_id=job_id, error=str(db_error))
@@ -209,7 +209,7 @@ def resume_job(self, job_id: int, version_id: int):
         logger.error("Job resume failed", job_id=job_id, error=str(e), processing_time=processing_time)
         
         # Increment failure counter
-        PIPELINE_RUNS_TOTAL.labels(status="failed").inc()
+        get_agent_runs_total().labels(agent="pipeline", status="failed").inc()
         
         raise Exception(f"Job resume failed: {str(e)}")
 
@@ -225,10 +225,10 @@ def get_pipeline_status():
         with get_db_session() as db:
             # Get job statistics
             total_jobs = db.query(Job).count()
-            pending_jobs = db.query(Job).filter(Job.status == JobStatus.PENDING).count()
-            processing_jobs = db.query(Job).filter(Job.status == JobStatus.PROCESSING).count()
-            ready_jobs = db.query(Job).filter(Job.status == JobStatus.READY).count()
-            failed_jobs = db.query(Job).filter(Job.status == JobStatus.FAILED).count()
+            pending_jobs = db.query(Job).filter(Job.status == JobStatus.PENDING.value).count()
+            processing_jobs = db.query(Job).filter(Job.status == JobStatus.PROCESSING.value).count()
+            ready_jobs = db.query(Job).filter(Job.status == JobStatus.READY.value).count()
+            failed_jobs = db.query(Job).filter(Job.status == JobStatus.FAILED.value).count()
             
             return {
                 "total_jobs": total_jobs,

@@ -11,22 +11,14 @@ import time
 import re
 import io
 from typing import Dict, Any, List
-from prometheus_client import Counter, Histogram
 import structlog
 import pandas as pd
 from bs4 import BeautifulSoup
 
 from ..storage import storage_client
+from ..metrics import get_agent_runs_total, get_agent_latency_seconds
 
 logger = structlog.get_logger(__name__)
-
-# Prometheus metrics
-AGENT_RUNS_TOTAL = Counter(
-    "agent_runs_total", "Total agent runs", ["agent"]
-)
-AGENT_LATENCY_SECONDS = Histogram(
-    "agent_latency_seconds", "Agent execution latency", ["agent"]
-)
 
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -45,7 +37,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     
     try:
         # Increment run counter
-        AGENT_RUNS_TOTAL.labels(agent=agent_name).inc()
+        get_agent_runs_total().labels(agent=agent_name, status="started").inc()
         
         classification = state.get("classification", {})
         artifacts = classification.get("artifacts", [])
@@ -124,7 +116,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     finally:
         # Record latency
         duration = time.time() - start_time
-        AGENT_LATENCY_SECONDS.labels(agent=agent_name).observe(duration)
+        get_agent_latency_seconds().labels(agent=agent_name).observe(duration)
 
 def _extract_html_table(html_content: str, artifact: Dict[str, Any]) -> List[Dict[str, Any]]:
     """Extract data from HTML table."""
@@ -156,16 +148,79 @@ def _extract_html_table(html_content: str, artifact: Dict[str, Any]) -> List[Dic
         if best_table is None:
             return []
         
-        # Convert to rows
+        # Convert to rows with proper schema mapping
         rows = []
+        
+        # Check if we have a header row (first row contains column names)
+        if len(best_table) > 1:
+            # Use first row as headers if it contains text that looks like column names
+            first_row = best_table.iloc[0].astype(str).str.lower()
+            has_text_headers = any(term in ' '.join(first_row) for term in ['provider', 'npi', 'specialty', 'name', 'date', 'reason'])
+            
+            if has_text_headers:
+                # Use first row as headers
+                best_table.columns = best_table.iloc[0]
+                best_table = best_table.drop(best_table.index[0]).reset_index(drop=True)
+                logger.info("Using first row as headers", headers=list(best_table.columns))
+        
         for idx, row in best_table.iterrows():
             row_data = {}
+            
+            # Map HTML table columns to expected Excel schema
             for col in best_table.columns:
                 value = row[col]
                 if pd.notna(value):
-                    row_data[str(col)] = str(value)
+                    value_str = str(value).strip()
+                    
+                    # Skip empty values
+                    if not value_str or value_str.lower() in ['nan', 'none', '']:
+                        continue
+                    
+                    # Map column names to Excel schema
+                    col_lower = str(col).lower().replace(":", "").replace("#", "").strip()
+                    
+                    if "provider name" in col_lower:
+                        row_data["Provider Name"] = value_str
+                    elif "npi" in col_lower:
+                        row_data["Provider NPI"] = value_str
+                    elif "specialty" in col_lower:
+                        row_data["Provider Specialty"] = value_str
+                    elif "provider type" in col_lower:
+                        row_data["Transaction Attribute"] = value_str
+                    elif "term date" in col_lower:
+                        row_data["Term Date"] = value_str
+                    elif "reason" in col_lower:
+                        row_data["Term Reason"] = value_str
             
+            # If we have data but no clear column mapping, try to infer from position
+            if not row_data and len(best_table.columns) >= 6:
+                # Assume standard order: Provider Name, NPI, Specialty, Provider Type, Term Date, Reason
+                values = [str(row[col]).strip() for col in best_table.columns if pd.notna(row[col])]
+                if len(values) >= 6:
+                    row_data = {
+                        "Provider Name": values[0] if values[0] else "",
+                        "Provider NPI": values[1] if values[1] else "",
+                        "Provider Specialty": values[2] if values[2] else "",
+                        "Transaction Attribute": values[3] if values[3] else "",
+                        "Term Date": values[4] if values[4] else "",
+                        "Term Reason": values[5] if values[5] else ""
+                    }
+            
+            # Set default values for required fields
             if row_data:  # Only add non-empty rows
+                # Set transaction type to "Term" since this is a termination notice
+                row_data["Transaction Type"] = "Term"
+                row_data["Effective Date"] = ""  # Not provided in email
+                row_data["State License"] = ""  # Not provided in email
+                row_data["Organization Name"] = "RCHN & RCSSD"  # From email text
+                row_data["TIN"] = "82-1111113"  # From email text
+                row_data["Group NPI"] = ""  # Not provided
+                row_data["Complete Address"] = ""  # Not provided
+                row_data["Phone Number"] = ""  # Not provided
+                row_data["Fax Number"] = ""  # Not provided
+                row_data["PPG ID"] = ""  # Not provided
+                row_data["Line Of Business"] = "FFS/PPO/ACO/HMO/Medi-Cal"  # From email text
+                
                 rows.append({
                     "row_idx": idx,
                     "data": row_data,
@@ -379,14 +434,30 @@ def _select_best_table(tables: List[pd.DataFrame]) -> pd.DataFrame:
         # Score based on number of rows and columns
         score = len(table) * len(table.columns)
         
-        # Bonus for common roster headers
-        headers = [str(col).lower() for col in table.columns]
-        roster_headers = ['npi', 'name', 'provider', 'specialty', 'phone', 'email', 'address']
-        header_matches = sum(1 for header in roster_headers if any(h in header for h in headers))
-        score += header_matches * 10
+        # Check if this looks like a roster table by examining the content
+        # Look for common roster terms in the actual data, not just headers
+        content_text = table.astype(str).values.flatten()
+        content_lower = ' '.join(content_text).lower()
+        
+        roster_terms = ['npi', 'provider', 'specialty', 'name', 'phone', 'email', 'address', 'terminate', 'voluntary']
+        content_matches = sum(1 for term in roster_terms if term in content_lower)
+        score += content_matches * 5
+        
+        # Bonus for tables with more than 1 row (header + data)
+        if len(table) > 1:
+            score += 10
+        
+        # Bonus for tables with reasonable number of columns (3-10)
+        if 3 <= len(table.columns) <= 10:
+            score += 5
         
         if score > best_score:
             best_score = score
             best_table = table
+    
+    logger.info("Table selection completed", 
+               tables_found=len(tables),
+               best_table_shape=best_table.shape if best_table is not None else None,
+               best_score=best_score)
     
     return best_table

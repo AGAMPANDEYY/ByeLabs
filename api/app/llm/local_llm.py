@@ -16,9 +16,10 @@ import time
 from typing import Dict, Any, List, Optional, Union
 import structlog
 
-from ..metrics import get_logger, track_vlm_invocation
+from ..metrics import get_vlm_invocations_total
+import structlog
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
 class LocalLLMClient:
     """
@@ -28,12 +29,12 @@ class LocalLLMClient:
     with CPU-only inference and strict resource limits.
     """
     
-    def __init__(self, model_name: str = "microsoft/DialoGPT-small", max_tokens: int = 512):
+    def __init__(self, model_name: str = None, max_tokens: int = 256):
         """
         Initialize the local LLM client.
         
         Args:
-            model_name: Hugging Face model name
+            model_name: Hugging Face model name (None to disable LLM)
             max_tokens: Maximum tokens for generation
         """
         self.model_name = model_name
@@ -42,11 +43,19 @@ class LocalLLMClient:
         self.tokenizer = None
         self.device = "cpu"
         self.is_loaded = False
+        self.is_enabled = model_name is not None
         
-        logger.info("LocalLLMClient initialized", model=model_name, max_tokens=max_tokens)
+        if self.is_enabled:
+            logger.info("LocalLLMClient initialized", model=model_name, max_tokens=max_tokens)
+        else:
+            logger.info("LocalLLMClient disabled - no model specified")
     
     def _load_model(self) -> bool:
         """Load the model and tokenizer. Returns True if successful."""
+        if not self.is_enabled:
+            logger.info("LLM disabled - skipping model load")
+            return False
+            
         if self.is_loaded:
             return True
         
@@ -80,7 +89,7 @@ class LocalLLMClient:
             logger.info("Local LLM model loaded successfully", model=self.model_name)
             
             # Track model loading
-            track_vlm_invocation("local_llm", "model_loaded")
+            get_vlm_invocations_total().labels(model="local_llm", status="model_loaded").inc()
             
             return True
             
@@ -96,7 +105,7 @@ class LocalLLMClient:
             self.is_loaded = False
             
             # Track model loading failure
-            track_vlm_invocation("local_llm", "model_load_failed")
+            get_vlm_invocations_total().labels(model="local_llm", status="model_load_failed").inc()
             
             return False
     
@@ -142,13 +151,13 @@ class LocalLLMClient:
             result = self._parse_classification_response(response)
             
             # Track successful classification
-            track_vlm_invocation("local_llm", "classification_success")
+            get_vlm_invocations_total().labels(model="local_llm", status="classification_success").inc()
             
             return result
             
         except Exception as e:
             logger.error("Classification failed", error=str(e))
-            track_vlm_invocation("local_llm", "classification_failed")
+            get_vlm_invocations_total().labels(model="local_llm", status="classification_failed").inc()
             return self._fallback_classification(content, headers)
     
     def suggest_header_mapping(self, extracted_headers: List[str], target_schema: List[str]) -> Dict[str, Any]:
@@ -176,13 +185,13 @@ class LocalLLMClient:
             result = self._parse_mapping_response(response, extracted_headers, target_schema)
             
             # Track successful mapping
-            track_vlm_invocation("local_llm", "mapping_success")
+            get_vlm_invocations_total().labels(model="local_llm", status="mapping_success").inc()
             
             return result
             
         except Exception as e:
             logger.error("Header mapping failed", error=str(e))
-            track_vlm_invocation("local_llm", "mapping_failed")
+            get_vlm_invocations_total().labels(model="local_llm", status="mapping_failed").inc()
             return self._fallback_header_mapping(extracted_headers, target_schema)
     
     def explain_validation_issue(self, issue: Dict[str, Any]) -> str:
@@ -209,13 +218,13 @@ class LocalLLMClient:
             explanation = self._clean_response(response)
             
             # Track successful explanation
-            track_vlm_invocation("local_llm", "explanation_success")
+            get_vlm_invocations_total().labels(model="local_llm", status="explanation_success").inc()
             
             return explanation
             
         except Exception as e:
             logger.error("Issue explanation failed", error=str(e))
-            track_vlm_invocation("local_llm", "explanation_failed")
+            get_vlm_invocations_total().labels(model="local_llm", status="explanation_failed").inc()
             return self._fallback_issue_explanation(issue)
     
     def _generate_response(self, prompt: str, max_new_tokens: int = 100) -> str:
@@ -425,15 +434,21 @@ def get_llm_client() -> Optional[LocalLLMClient]:
             logger.info("Local LLM disabled via LOCAL_LLM_ENABLED=false")
             return None
         
-        # Get model name from environment
+        # Get model name from environment - use a smaller, faster model
         model_name = os.getenv("LOCAL_LLM_MODEL", "microsoft/DialoGPT-small")
-        max_tokens = int(os.getenv("LOCAL_LLM_MAX_TOKENS", "512"))
+        max_tokens = int(os.getenv("LOCAL_LLM_MAX_TOKENS", "256"))
+        
+        # If no model specified, return None (graceful fallback)
+        if not model_name or model_name.lower() in ["none", "null", ""]:
+            logger.info("No LLM model specified - using rule-based fallbacks")
+            return None
         
         try:
             _llm_client = LocalLLMClient(model_name=model_name, max_tokens=max_tokens)
             logger.info("Local LLM client created", model=model_name)
         except Exception as e:
             logger.error("Failed to create LLM client", error=str(e))
+            logger.info("Falling back to rule-based processing")
             _llm_client = None
     
     return _llm_client

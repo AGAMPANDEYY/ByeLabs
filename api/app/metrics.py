@@ -17,65 +17,73 @@ from prometheus_client import Counter, Histogram, Gauge, Info
 import structlog
 
 # ============================================================================
-# PROMETHEUS METRICS
+# PROMETHEUS METRICS (Lazy Registration)
 # ============================================================================
 
-# Per-agent metrics
-AGENT_RUNS_TOTAL = Counter(
-    "agent_runs_total", 
-    "Total agent runs", 
-    ["agent", "status"]
-)
+# Global metrics registry to prevent duplicates
+_metrics_registry = {}
 
-AGENT_LATENCY_SECONDS = Histogram(
-    "agent_latency_seconds", 
-    "Agent execution latency in seconds", 
-    ["agent"],
-    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0]
-)
+def _get_or_create_metric(metric_type, name, description, **kwargs):
+    """Get or create a metric to prevent duplicate registration."""
+    if name not in _metrics_registry:
+        _metrics_registry[name] = metric_type(name, description, **kwargs)
+    return _metrics_registry[name]
 
-AGENT_ERRORS_TOTAL = Counter(
-    "agent_errors_total",
-    "Total agent errors",
-    ["agent", "error_type"]
-)
+def get_agent_runs_total():
+    """Get or create agent runs counter."""
+    return _get_or_create_metric(
+        Counter, "agent_runs_total", "Total agent runs", labelnames=["agent", "status"]
+    )
 
-# Pipeline-level metrics
-VLM_INVOCATIONS_TOTAL = Counter(
-    "vlm_invocations_total",
-    "Total VLM service invocations",
-    ["model", "status"]
-)
+def get_agent_latency_seconds():
+    """Get or create agent latency histogram."""
+    return _get_or_create_metric(
+        Histogram, "agent_latency_seconds", "Agent execution latency in seconds", 
+        labelnames=["agent"], buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0, 120.0]
+    )
 
-EXTRACT_FALLBACK_TOTAL = Counter(
-    "extract_fallback_total",
-    "Total extraction fallbacks",
-    ["extractor", "fallback_type"]
-)
+def get_agent_errors_total():
+    """Get or create agent errors counter."""
+    return _get_or_create_metric(
+        Counter, "agent_errors_total", "Total agent errors", labelnames=["agent", "error_type"]
+    )
 
-PIPELINE_JOBS_PROCESSED_TOTAL = Counter(
-    "pipeline_jobs_processed_total",
-    "Total jobs processed by pipeline",
-    ["status"]
-)
+def get_vlm_invocations_total():
+    """Get or create VLM invocations counter."""
+    return _get_or_create_metric(
+        Counter, "vlm_invocations_total", "Total VLM service invocations", labelnames=["model", "status"]
+    )
 
-PIPELINE_E2E_DURATION_SECONDS = Histogram(
-    "pipeline_e2e_duration_seconds",
-    "End-to-end pipeline processing duration",
-    ["status"],
-    buckets=[1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0]
-)
+def get_extract_fallback_total():
+    """Get or create extract fallback counter."""
+    return _get_or_create_metric(
+        Counter, "extract_fallback_total", "Total extraction fallbacks", labelnames=["extractor", "fallback_type"]
+    )
 
-# System metrics
-ACTIVE_JOBS_GAUGE = Gauge(
-    "active_jobs_total",
-    "Number of currently active jobs"
-)
+def get_pipeline_jobs_processed_total():
+    """Get or create pipeline jobs processed counter."""
+    return _get_or_create_metric(
+        Counter, "pipeline_jobs_processed_total", "Total jobs processed by pipeline", labelnames=["status"]
+    )
 
-SYSTEM_INFO = Info(
-    "system_info",
-    "System information"
-)
+def get_pipeline_e2e_duration_seconds():
+    """Get or create pipeline E2E duration histogram."""
+    return _get_or_create_metric(
+        Histogram, "pipeline_e2e_duration_seconds", "End-to-end pipeline processing duration",
+        labelnames=["status"], buckets=[1.0, 5.0, 10.0, 30.0, 60.0, 120.0, 300.0, 600.0, 1200.0]
+    )
+
+def get_active_jobs_gauge():
+    """Get or create active jobs gauge."""
+    return _get_or_create_metric(
+        Gauge, "active_jobs_total", "Number of currently active jobs"
+    )
+
+def get_system_info():
+    """Get or create system info."""
+    return _get_or_create_metric(
+        Info, "system_info", "System information"
+    )
 
 # ============================================================================
 # STRUCTURED LOGGING SETUP
@@ -154,13 +162,13 @@ def track_agent_metrics(agent_name: str):
             
             try:
                 # Increment run counter
-                AGENT_RUNS_TOTAL.labels(agent=agent_name, status="started").inc()
+                get_agent_runs_total().labels(agent=agent_name, status="started").inc()
                 
                 # Execute the function
                 result = func(*args, **kwargs)
                 
                 # Record success
-                AGENT_RUNS_TOTAL.labels(agent=agent_name, status="success").inc()
+                get_agent_runs_total().labels(agent=agent_name, status="success").inc()
                 
                 # Log success
                 logger.info(
@@ -175,8 +183,8 @@ def track_agent_metrics(agent_name: str):
                 
             except Exception as e:
                 # Record error
-                AGENT_RUNS_TOTAL.labels(agent=agent_name, status="error").inc()
-                AGENT_ERRORS_TOTAL.labels(agent=agent_name, error_type=type(e).__name__).inc()
+                get_agent_runs_total().labels(agent=agent_name, status="error").inc()
+                get_agent_errors_total().labels(agent=agent_name, error_type=type(e).__name__).inc()
                 
                 # Log error
                 logger.error(
@@ -194,7 +202,7 @@ def track_agent_metrics(agent_name: str):
             finally:
                 # Record latency
                 duration = time.time() - start_time
-                AGENT_LATENCY_SECONDS.labels(agent=agent_name).observe(duration)
+                get_agent_latency_seconds().labels(agent=agent_name).observe(duration)
                 
                 # Log completion
                 logger.info(
@@ -238,7 +246,7 @@ def track_pipeline_metrics():
                 result = func(*args, **kwargs)
                 
                 # Record success
-                PIPELINE_JOBS_PROCESSED_TOTAL.labels(status="success").inc()
+                get_pipeline_jobs_processed_total().labels(status="success").inc()
                 
                 logger.info(
                     "Pipeline completed successfully",
@@ -250,7 +258,7 @@ def track_pipeline_metrics():
                 
             except Exception as e:
                 # Record error
-                PIPELINE_JOBS_PROCESSED_TOTAL.labels(status="error").inc()
+                get_pipeline_jobs_processed_total().labels(status="error").inc()
                 
                 logger.error(
                     "Pipeline failed",
@@ -266,7 +274,7 @@ def track_pipeline_metrics():
                 # Record E2E duration
                 duration = time.time() - start_time
                 status = "success" if "result" in locals() else "error"
-                PIPELINE_E2E_DURATION_SECONDS.labels(status=status).observe(duration)
+                get_pipeline_e2e_duration_seconds().labels(status=status).observe(duration)
                 
                 logger.info(
                     "Pipeline completed",
@@ -285,7 +293,7 @@ def track_pipeline_metrics():
 
 def track_vlm_invocation(model: str, status: str = "success"):
     """Track VLM service invocation."""
-    VLM_INVOCATIONS_TOTAL.labels(model=model, status=status).inc()
+    get_vlm_invocations_total().labels(model=model, status=status).inc()
     
     logger = structlog.get_logger("vlm")
     logger.info(
@@ -296,7 +304,7 @@ def track_vlm_invocation(model: str, status: str = "success"):
 
 def track_extract_fallback(extractor: str, fallback_type: str):
     """Track extraction fallback usage."""
-    EXTRACT_FALLBACK_TOTAL.labels(extractor=extractor, fallback_type=fallback_type).inc()
+    get_extract_fallback_total().labels(extractor=extractor, fallback_type=fallback_type).inc()
     
     logger = structlog.get_logger("extractor")
     logger.info(
@@ -311,11 +319,11 @@ def track_extract_fallback(extractor: str, fallback_type: str):
 
 def update_active_jobs_count(count: int):
     """Update the active jobs gauge."""
-    ACTIVE_JOBS_GAUGE.set(count)
+    get_active_jobs_gauge().set(count)
 
 def set_system_info(version: str, build_date: str, git_commit: str = "unknown"):
     """Set system information."""
-    SYSTEM_INFO.info({
+    get_system_info().info({
         "version": version,
         "build_date": build_date,
         "git_commit": git_commit,

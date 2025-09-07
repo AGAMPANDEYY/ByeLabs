@@ -11,7 +11,7 @@ This agent handles PDF-specific extraction:
 import time
 import io
 from typing import Dict, Any, List
-from prometheus_client import Counter, Histogram
+from ..metrics import get_agent_runs_total, get_agent_latency_seconds
 import structlog
 import pdfplumber
 import camelot
@@ -22,13 +22,7 @@ from ..storage import storage_client, generate_object_key, calculate_checksum
 
 logger = structlog.get_logger(__name__)
 
-# Prometheus metrics
-AGENT_RUNS_TOTAL = Counter(
-    "agent_runs_total", "Total agent runs", ["agent"]
-)
-AGENT_LATENCY_SECONDS = Histogram(
-    "agent_latency_seconds", "Agent execution latency", ["agent"]
-)
+# Metrics are now imported from metrics module
 
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -47,7 +41,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     
     try:
         # Increment run counter
-        AGENT_RUNS_TOTAL.labels(agent=agent_name).inc()
+        get_agent_runs_total().labels(agent=agent_name, status="started").inc()
         
         classification = state.get("classification", {})
         artifacts = classification.get("artifacts", [])
@@ -132,7 +126,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     finally:
         # Record latency
         duration = time.time() - start_time
-        AGENT_LATENCY_SECONDS.labels(agent=agent_name).observe(duration)
+        get_agent_latency_seconds().labels(agent=agent_name).observe(duration)
 
 def _classify_pdf_type(pdf_content: bytes) -> str:
     """Determine if PDF is native (text-based) or scanned (image-based)."""

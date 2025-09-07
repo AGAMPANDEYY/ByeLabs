@@ -6,11 +6,19 @@ ENV PYTHONUNBUFFERED=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install minimal system dependencies
+# Install system dependencies for Camelot + OpenCV + PDF processing
 RUN apt-get update && apt-get install -y \
     curl \
     gcc \
     g++ \
+    ghostscript \
+    libgl1 \
+    libglib2.0-0 \
+    libsm6 \
+    libxrender1 \
+    libxext6 \
+    libgomp1 \
+    libgthread-2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
 # Set work directory

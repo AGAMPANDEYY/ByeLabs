@@ -1,3 +1,73 @@
  command to run docker add it to system path in current session 
 
  $env:Path = [System.Environment]::GetEnvironmentVariable("Path","Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path","User")
+
+
+ # List running containers
+docker ps
+
+# List all containers (including stopped)
+docker ps -a
+
+# Stop a specific container
+docker stop <container_name>
+
+# Start a stopped container
+docker start <container_name>
+
+# Restart a container
+docker restart <container_name>
+
+# Remove a container
+docker rm <container_name>
+
+# Remove a running container (force)
+docker rm -f <container_name>
+
+
+# Start all services
+docker compose -f docker-compose.simple.yml up -d
+
+# Stop all services
+docker compose -f docker-compose.simple.yml down
+
+# Rebuild and start
+docker compose -f docker-compose.simple.yml up -d --build
+
+# Start specific service
+docker compose -f docker-compose.simple.yml up -d api
+
+# Stop specific service
+docker compose -f docker-compose.simple.yml stop api
+
+# View logs
+docker compose -f docker-compose.simple.yml logs api
+
+# View logs with follow
+docker compose -f docker-compose.simple.yml logs -f api
+
+
+# View container logs
+docker logs <container_name>
+
+# View last 50 lines of logs
+docker logs --tail 50 <container_name>
+
+# Follow logs in real-time
+docker logs -f <container_name>
+
+# View logs since specific time
+docker logs --since 10m <container_name>
+
+
+# View container logs
+docker logs <container_name>
+
+# View last 50 lines of logs
+docker logs --tail 50 <container_name>
+
+# Follow logs in real-time
+docker logs -f <container_name>
+
+# View logs since specific time
+docker logs --since 10m <container_name>

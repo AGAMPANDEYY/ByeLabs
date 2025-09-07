@@ -13,11 +13,11 @@ from datetime import datetime, timezone
 
 from ..db import get_db_session
 from ..models import Job, Version, Record, Issue, AuditLog, JobStatus, IssueLevel
-from ..metrics import track_agent_metrics, get_logger
+from ..metrics import get_agent_runs_total, get_agent_latency_seconds
+import structlog
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
-@track_agent_metrics("versioner")
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Create new version with validated data.
@@ -138,7 +138,7 @@ def _store_issues(version_id: int, validation_issues: List[Dict[str, Any]]) -> i
                 version_id=version_id,
                 row_idx=issue.get("row_idx", 0),
                 field=issue.get("field", ""),
-                level=IssueLevel(issue.get("level", "warning")),
+                level=issue.get("level", "warning"),
                 message=issue.get("message", ""),
                 created_at=datetime.now(timezone.utc)
             )
@@ -160,9 +160,9 @@ def _update_job_version(job_id: int, version_id: int, validation_stats: Dict[str
             # Update job status based on validation results
             error_count = validation_stats.get("error_count", 0)
             if error_count > 0:
-                job.status = JobStatus.NEEDS_REVIEW
+                job.status = JobStatus.NEEDS_REVIEW.value
             else:
-                job.status = JobStatus.COMPLETED
+                job.status = JobStatus.READY.value
             
             db.commit()
 

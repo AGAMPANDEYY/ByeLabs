@@ -11,12 +11,11 @@ import time
 import re
 from typing import Dict, Any, List
 
-from ..metrics import track_agent_metrics, get_logger, track_extract_fallback
+from ..metrics import get_agent_runs_total, get_agent_latency_seconds
 from ..llm import get_llm_client
+import structlog
 
-logger = get_logger(__name__)
-
-@track_agent_metrics("classifier")
+logger = structlog.get_logger(__name__)
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Classify documents and determine processing strategy.
@@ -27,6 +26,9 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     Returns:
         Updated state with classification results
     """
+    start_time = time.time()
+    agent_name = "classifier"
+    
     logger.info("Starting classifier agent", job_id=state.get("job_id"))
     
     try:
@@ -93,7 +95,7 @@ def run(state: Dict[str, Any]) -> Dict[str, Any]:
     finally:
         # Record latency
         duration = time.time() - start_time
-        AGENT_LATENCY_SECONDS.labels(agent=agent_name).observe(duration)
+        get_agent_latency_seconds().labels(agent=agent_name).observe(duration)
 
 def _classify_email_body(email_body: Dict[str, Any], llm_client=None) -> Dict[str, Any]:
     """Classify email body content."""
@@ -135,7 +137,7 @@ def _classify_email_body(email_body: Dict[str, Any], llm_client=None) -> Dict[st
                     }
             except Exception as e:
                 logger.warning("LLM classification failed, using fallback", error=str(e))
-                track_extract_fallback("classifier", "llm_classification_failed")
+                # LLM classification failed, using rule-based fallback
         
         # Fallback to rule-based classification
         return {

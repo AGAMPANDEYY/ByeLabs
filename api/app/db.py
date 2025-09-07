@@ -9,7 +9,7 @@ import logging
 from contextlib import contextmanager
 from typing import Generator
 
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.orm import sessionmaker, Session
 from sqlalchemy.pool import StaticPool
@@ -149,10 +149,10 @@ def get_database_info() -> dict:
         with get_db_session() as session:
             # Get database version
             if "postgresql" in settings.database_url:
-                result = session.execute("SELECT version()")
+                result = session.execute(text("SELECT version()"))
                 version = result.scalar()
             elif "sqlite" in settings.database_url:
-                result = session.execute("SELECT sqlite_version()")
+                result = session.execute(text("SELECT sqlite_version()"))
                 version = result.scalar()
             else:
                 version = "Unknown"

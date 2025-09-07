@@ -105,11 +105,20 @@ class StorageClient:
             
             # Store the object
             logger.debug(f"Storing object: {key}")
+            
+            # Get the length of the data
+            if hasattr(data, 'seek'):
+                data.seek(0, 2)  # Seek to end
+                length = data.tell()
+                data.seek(0)  # Reset to beginning
+            else:
+                length = len(data)
+            
             self.client.put_object(
                 bucket_name=self.bucket_name,
                 object_name=key,
                 data=data,
-                length=-1,  # Let MinIO determine length
+                length=length,
                 content_type=content_type,
                 metadata=metadata
             )

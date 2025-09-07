@@ -11,6 +11,7 @@ This is the main FastAPI application that provides:
 import logging
 import time
 import email
+import email.policy
 import hashlib
 import uuid
 from contextlib import asynccontextmanager
@@ -21,7 +22,7 @@ from fastapi import FastAPI, Request, Response, UploadFile, File, HTTPException,
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, HTMLResponse
 from fastapi.templating import Jinja2Templates
-from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 import structlog
 from sqlalchemy.orm import Session
 
@@ -54,7 +55,12 @@ structlog.configure(
 
 logger = structlog.get_logger(__name__)
 
-# Prometheus metrics
+# Prometheus metrics (using lazy registration)
+from .metrics import get_agent_runs_total, get_agent_latency_seconds, get_active_jobs_gauge
+
+# Create HTTP-specific metrics
+from prometheus_client import Counter, Histogram, Gauge
+
 REQUEST_COUNT = Counter(
     'http_requests_total',
     'Total HTTP requests',
@@ -420,7 +426,12 @@ async def ingest_eml_file(
         
         # Parse email headers
         try:
-            email_message = email.message_from_bytes(content, policy=email.policy.default)
+            # Use default policy for Python 3.3+, fallback for older versions
+            try:
+                email_message = email.message_from_bytes(content, policy=email.policy.default)
+            except AttributeError:
+                # Fallback for older Python versions
+                email_message = email.message_from_bytes(content)
         except Exception as e:
             logger.error("Failed to parse EML file", error=str(e))
             raise HTTPException(status_code=400, detail=f"Invalid EML file: {str(e)}")
@@ -487,7 +498,7 @@ async def ingest_eml_file(
         # Create Job record
         job = Job(
             email_id=email_record.id,
-            status=JobStatus.PENDING
+            status=JobStatus.PENDING.value
         )
         db.add(job)
         db.flush()  # Get the ID
@@ -723,6 +734,62 @@ async def get_job_details(
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
+@app.post("/jobs/{job_id}/process", summary="Process Job", tags=["Jobs"])
+async def process_job_endpoint(
+    job_id: int,
+    db: Session = Depends(get_db)
+):
+    """
+    Trigger processing of a job through the multi-agent pipeline.
+    
+    Args:
+        job_id: The job ID to process
+        db: Database session
+    
+    Returns:
+        Processing status and task information
+    
+    Raises:
+        HTTPException: 404 if job not found, 400 if job cannot be processed
+    """
+    logger.info("Triggering job processing", job_id=job_id)
+    
+    try:
+        # Get job
+        job = db.query(Job).filter(Job.id == job_id).first()
+        
+        if not job:
+            raise HTTPException(status_code=404, detail=f"Job {job_id} not found")
+        
+        # Check if job can be processed
+        if job.status not in ["pending", "failed"]:
+            raise HTTPException(
+                status_code=400, 
+                detail=f"Job {job_id} cannot be processed. Current status: {job.status}"
+            )
+        
+        # Import Celery task
+        from .pipeline import process_job
+        
+        # Queue the job for processing
+        task = process_job.delay(job_id)
+        
+        logger.info("Job processing queued", job_id=job_id, task_id=task.id)
+        
+        return {
+            "job_id": job_id,
+            "task_id": task.id,
+            "status": "queued",
+            "message": f"Job {job_id} has been queued for processing"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Error queuing job processing", job_id=job_id, error=str(e))
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
 # ============================================================================
 # UI ROUTES (HTMX)
 # ============================================================================
@@ -738,7 +805,7 @@ async def ui_jobs_list():
             for job in jobs:
                 jobs_data.append({
                     "id": job.id,
-                    "status": job.status.value,
+                    "status": job.status,
                     "created_at": job.created_at.strftime("%Y-%m-%d %H:%M"),
                     "updated_at": job.updated_at.strftime("%Y-%m-%d %H:%M") if job.updated_at else None,
                     "current_version_id": job.current_version_id
@@ -773,7 +840,7 @@ async def ui_job_detail(job_id: int):
             issues = []
             if job.current_version_id:
                 issues_query = db.query(Issue).filter(Issue.version_id == job.current_version_id)
-                issues = [{"row_idx": i.row_idx, "field": i.field, "level": i.level.value, "message": i.message} for i in issues_query.all()]
+                issues = [{"row_idx": i.row_idx, "field": i.field, "level": i.level, "message": i.message} for i in issues_query.all()]
             
             # Get versions history
             versions = db.query(Version).filter(Version.job_id == job_id).order_by(Version.created_at.desc()).all()
@@ -783,7 +850,7 @@ async def ui_job_detail(job_id: int):
             "request": request,
             "job": {
                 "id": job.id,
-                "status": job.status.value,
+                "status": job.status,
                 "created_at": job.created_at.strftime("%Y-%m-%d %H:%M"),
                 "current_version_id": job.current_version_id
             },
@@ -864,7 +931,7 @@ async def ui_edit_record(job_id: int, request: Request):
                     version_id=new_version.id,
                     row_idx=issue["row_idx"],
                     field=issue["field"],
-                    level=IssueLevel(issue["level"]),
+                    level=issue["level"],
                     message=issue["message"],
                     created_at=datetime.now(timezone.utc)
                 )
@@ -1003,7 +1070,7 @@ async def download_export(export_id: int):
             object_key = export.file_uri.replace("s3://hilabs-artifacts/", "")
             
             # Get file from MinIO
-            file_data = storage_client.get_bytes("hilabs-artifacts", object_key)
+            file_data = storage_client.get_bytes(object_key)
             
             # Generate filename
             filename = f"roster_export_job_{export.job_id}_v{export.version_id}.xlsx"
@@ -1041,7 +1108,7 @@ async def explain_issue(issue_id: int):
             # Prepare issue data for LLM
             issue_data = {
                 "field": issue.field,
-                "level": issue.level.value,
+                "level": issue.level,
                 "message": issue.message,
                 "row_idx": issue.row_idx
             }

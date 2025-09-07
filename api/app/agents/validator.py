@@ -9,21 +9,20 @@ This agent validates normalized data:
 
 import time
 import re
-from typing import Dict, Any, List, Set
+from typing import Dict, Any, List, Set, Optional
 from datetime import datetime, date
 from dateutil.parser import parse as parse_date
 
-from ..metrics import track_agent_metrics, get_logger
+from ..metrics import get_agent_runs_total, get_agent_latency_seconds
+import structlog
 
-logger = get_logger(__name__)
+logger = structlog.get_logger(__name__)
 
 # Required fields for validation
 REQUIRED_FIELDS = ["NPI", "Provider Name", "Specialty", "Effective Date"]
 
 # Fields that should not be empty if present
 OPTIONAL_BUT_VALIDATED_FIELDS = ["Phone", "Email", "Address", "DOB", "Term Date"]
-
-@track_agent_metrics("validator")
 def run(state: Dict[str, Any]) -> Dict[str, Any]:
     """
     Validate normalized data and generate comprehensive issues.

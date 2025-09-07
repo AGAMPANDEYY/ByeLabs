@@ -1,476 +1,312 @@
-# HiLabs Roster Email → Excel (Local-Only, Multi-Agent, VLM-Assisted)
+# HiLabs Roster Automation (Local-first, Multi-Agent, AI-Driven)
 
-## 🎯 Goal
-Convert provider roster emails (**HTML/PDF/Image/XLS/CSV/Inline Text**) into a **clean Excel** matching the required schema—completely end-to-end on your machine, with auditability, version history/rollback, a review UI, and **AI assist (local VLM)** for tough documents.
+> **Touchless end-to-end roster processing** — from raw emails (`.eml`, PDFs, images, HTML tables, CSV/XLSX) to a perfectly formatted Excel in one click.
+> **Everything runs 100% locally** (no proprietary APIs, no third-party uploads).
+> Built with a **multi-agent pipeline**, **open-source LLM/VLM**, versioning + rollback, analytics, and production-style observability.
 
-## ✅ Rule Compliance  
-- ✅ **Open source code**  
-- ✅ **Runs fully locally**: Docker Compose brings up DB, object store, queue, VLM, and SMTP test server  
-- ✅ **No uploads** to third-party servers  
-- ✅ **No proprietary LLM** calls  
-- ✅ Public repo includes **run script and full instructions**
+---
 
-***
+## We thought Scailibity, Architectures and AI!
 
-## 🚀 Quick Start (5–10 minutes)
+* **Local-only by design:** All parsing, model inference, training, storage, and analytics run on your machine with Docker/Compose or a single Python env. Zero calls to closed APIs.
+* **Agentic AI + Rules:** A **multi-agent** workflow that prefers deterministic parsers first, then escalates to **open-source LLMs/VLM** (e.g., MiniCPM-V, LayoutLMv3) to crush tricky PDFs/scans.
+* **Data quality you can trust:** Strong normalization + validation (NPI Luhn, phone, address, dates, duplicates, schema checks) and **human-in-the-loop review**.
+* **Auditability built-in:** Every change creates a **version**; export binds to a version; you can **diff & rollback** anytime.
+* **Observability like production:** Metrics, logs, and traces (Prometheus + OpenTelemetry + Grafana) so judges can *see* the system working.
+* **Research-grade training:** We trained a **small local model (SLM)** with **GRPO** (Group-Relative Preference Optimization) using **silver-labeled weak supervision** + LoRA adapters, so it learns our schema and avoids hallucinations.
 
-### Prerequisites
-- **macOS / Linux / Windows (WSL2)**
-- **Docker Desktop** (Compose v2)
-- **~8–12 GB RAM** free for services (CPU-only works; GPU optional)
+> We optimized for **hackathon reality**: limited time, no external services, but architected for **scale and maintainability** if this graduates into a product.
 
-### One-Command Setup
+---
+
+##  System Overview
+
+---
+
+## Features
+
+* **Email ingestion:** `.eml` upload (and optional local SMTP via Mailpit) with attachment handling.
+* **Format coverage:** HTML body tables, CSV/XLSX, native PDFs, scanned PDFs/images.
+* **Multi-agent pipeline:** Intake → Classification → Extraction (rules) → **VLM fallback** → Normalization → Validation → Versioning → Excel export.
+* **AI stack (all local):**
+  * **Doc model:** LayoutLMv3 (for doc-layout aware text).
+  * **SLM (local LLM):** fine-tuned via **GRPO** with LoRA adapters.
+* **Normalization:** phone (E.164), address (usaddress/libpostal), dates (dateparser with `MDY`), NPI checksum (Luhn with `80840`).
+* **Validation:** required fields, enumerations, duplicates, cross-field rules, confidence thresholds.
+* **Review UI:** spreadsheet-like editor, side-by-side original preview, issues list, **diff + rollback**.
+* **Exports:** exact Excel template with correct column order/types and hidden provenance sheet.
+* **Observability:** per-stage timing, fallback rates, error heatmaps, traces spanning the whole job.
+
+---
+
+## Training the local SLM with **GRPO**
+
+**Goal:** make a small local model reliably output schema-exact JSON rows from messy text/PDF extractions.
+
+* **Silver labels (weak supervision):**
+  We bootstrap labels by:
+
+  * Running deterministic extractors on the 3 provided samples → canonical Excel/JSON.
+  * Programmatically **augmenting** structures (names, NPIs, phones, addresses, row permutations, header variants).
+  * Generating **preference pairs**: (good JSON) vs (perturbed JSON with realistic mistakes: wrong formats, missing required fields, invalid NPIs), to train **preferences** not just answers.
+
+* **Reward design (per sample):**
+
+  * **Completeness** (required fields present)
+  * **Accuracy** (matches canonical/normalized values)
+  * **Format** (NPI/phone/date/address format rules)
+  * **Consistency** (cross-field constraints, duplicates)
+  * Weighted into a single **scalar reward** in `[0,1]`.
+
+* **GRPO (Group-Relative Preference Optimization):**
+
+  * For each prompt, sample multiple candidate outputs from the SLM (group).
+  * Score each with the reward function.
+  * Optimize the policy to increase probability of higher-scoring candidates **relative** to lower-scoring ones in the same group (stable, offline-friendly alternative to standard RLHF).
+  * Implemented as a lightweight custom trainer on top of 🤗 Transformers + PEFT (LoRA), fully **offline**.
+
+* **Why GRPO here?**
+  With tiny data and strict schema, **relative, reward-shaped learning** aligns the SLM to *prefer* well-formed, schema-valid outputs and reject hallucinations.
+
+> All training/inference runs locally (CPU okay; GPU recommended). No external API calls.
+
+---
+
+## Multi-Agent pipeline (logic you can reason about)
+
+**Rule-first. AI-assist only when needed.** That’s how we keep it fast, cheap, and reliable.
+
+1. **Intake Agent** – parse `.eml`, extract HTML/text/attachments, store raw artifacts to MinIO; create a `job`.
+2. **Classifier Agent** – route to HTML/CSV/XLSX/PDF-native/PDF-scan/plain-text pipelines; choose tools + thresholds.
+3. **Extractor (rules)** –
+
+   * HTML → `pandas.read_html` (+ BeautifulSoup cleaning)
+   * CSV/XLSX → `pandas.read_csv/excel`
+   * PDF-native → `pdfplumber` + `camelot` lattice/stream (pick max coverage/headers)
+   * Plain text → table inference + regex heuristics
+4. **VLM Assist (fallback/augment)** – MiniCPM-V for PDF scans/images and low-confidence segments; prompts are schema-aware and ask for **JSON only**.
+5. **Normalizer** – `phonenumbers`, `usaddress/libpostal`, `dateparser`, **NPI Luhn**; log changes + confidences.
+6. **Validator** – required fields, enumerations, duplicates, cross-field (e.g., effective ≤ termination), per-cell issues with suggestions.
+7. **Versioner** – snapshot rows; every edit creates a new **version**; **rollback** anytime.
+8. **Exporter** – write Excel template (openpyxl/xlsxwriter) with exact sheet/columns/types; add hidden provenance sheet.
+
+---
+
+## Tech Stack
+
+* **Frontend:** Next.js (App Router), TypeScript, TailwindCSS, shadcn/ui, TanStack Table.
+* **API:** FastAPI, Pydantic v2, SQLAlchemy 2.
+* **Workers/Queue:** Celery + RabbitMQ (async, scalable).
+* **Data layer:** PostgreSQL, MinIO (S3-compatible), Redis.
+* **Doc parsing:** pdfplumber, camelot, PyMuPDF, BeautifulSoup, pandas.
+* **NLP/NLU:** transformers, PyTorch, **LayoutLMv3** (doc-aware), **MiniCPM-V** (VLM).
+* **Validation:** phonenumbers, usaddress, libpostal, dateparser.
+* **Observability:** Prometheus, OpenTelemetry, Grafana.
+* **DevOps:** Docker + Docker Compose (single command to spin up).
+
+---
+
+## Local-only, reproducible setup
+
+> **Requirement satisfied:** *No uploads to third-party servers; no proprietary LLM APIs.*
+
+### Prereqs
+
+* Docker + Docker Compose
+* (Optional) NVIDIA drivers for GPU
+* Node 18+, Python 3.11+ if running outside Docker
+
+### One-liner (recommended)
+
 ```bash
-git clone https://github.com/<you>/hilabs-roster.git
-cd hilabs-roster
-./run.sh               # brings up full stack locally
-```
-
-The `run.sh` script will:
-- ✅ Copy `.env.example` → `.env` if missing
-- ✅ Create directory structure
-- ✅ Start all services with Docker Compose
-- ✅ Wait for services to be ready
-- ✅ Display all service URLs
-
-***
-
-## 🌐 Service URLs
-
-| Service | URL | Credentials |
-|---------|-----|-------------|
-| **API Documentation** | [http://localhost:8000/docs](http://localhost:8000/docs) | - |
-| **Review UI** | [http://localhost:8000/ui/jobs](http://localhost:8000/ui/jobs) | - |
-| **Mailpit (Email Test)** | [http://localhost:8025](http://localhost:8025) | - |
-| **MinIO Console** | [http://localhost:9001](http://localhost:9001) | `minio` / `minio123` |
-| **RabbitMQ Management** | [http://localhost:15672](http://localhost:15672) | `guest` / `guest` |
-| **Metrics (Prometheus)** | [http://localhost:8000/metrics](http://localhost:8000/metrics) | - |
-| **VLM Health Check** | [http://localhost:8080/health](http://localhost:8080/health) | - |
-| **Flower (Task Monitor)** | [http://localhost:5555](http://localhost:5555) | `admin` / `admin` |
-
-## 🤖 Local LLM Configuration (Optional)
-
-The system includes optional local LLM integration for enhanced processing. By default, it's disabled and uses rule-based fallbacks.
-
-### Recommended Small Models (Fast & Lightweight)
-- `microsoft/DialoGPT-small` (117M parameters) - **Default, fastest**
-- `distilbert-base-uncased` (66M parameters) - **Smallest**
-- `microsoft/DialoGPT-medium` (345M parameters) - **Better quality**
-
-### Enable Local LLM
-```bash
-# In your .env file
-LOCAL_LLM_ENABLED=true
-LOCAL_LLM_MODEL=microsoft/DialoGPT-small
-LOCAL_LLM_MAX_TOKENS=256
-```
-
-### Disable LLM (Use Rule-Based Only)
-```bash
-# In your .env file
-LOCAL_LLM_ENABLED=false
-# OR
-LOCAL_LLM_MODEL=none
-```
-
-**Note**: If no model is specified or LLM fails to load, the system gracefully falls back to rule-based processing without errors.
-
-***
-
-## Process a Sample
-
-### Option A: via API (using provided samples)
-```sh
-curl -F "eml=@./samples/Sample-1.eml" http://localhost:8000/ingest
-```
-
-### Option B: via Email (into Mailpit)
-Send an email (SMTP: `localhost:1025`), then click **“Process to Excel”** in the UI.
-
-### Check Jobs & Export
-```sh
-curl http://localhost:8000/jobs
-curl -X POST http://localhost:8000/jobs/1/export
-```
-
-***
-
-## Architecture (Local-Only)
-
-```
-               ┌─────────────────────────────────────┐
-               │                 UI                  │
-               │ Inbox / Review / Versions / Export  │
-               └───────────────▲───────────┬────────┘
-                               │           │
-                         (approve/edit)    │(download Excel)
-                               │           │
-┌─────────────┐  POST /ingest  │           │         ┌───────────────┐
-│  Mailpit    │ ──────────────▶│      ┌────▼───┐     │   MinIO       │
-│ (SMTP test) │                 │      │ Export │────▶│ (object store)│
-└─────▲───────┘                 │      └───┬────┘     └─────▲─────────┘
-      │                         │          │                │
-      │ (send email)            │     xlsx │                │
-      │                         │          │ raw .eml, att  │
-┌─────┴────────┐     Celery     │          │                │
-│   FastAPI    │  ──────────────┼──────────┘                │
-│ (API/Gateway│    queue        │                           │
-│  /UI)       ├─────────────────┘                           │
-└─────┬────────┘                                            │
-      │                              artifacts / exports ◀──┘
-      │
-      │  pipeline tasks     ┌─────────────────────────────────────────────┐
-      └────────────────────▶│ Multi-Agent Workers (Celery)               │
-                            │ Intake→Classify→Extract(rule→VLM)→...      │
-                            │ →Normalize→Validate→Version→Export         │
-                            └─────────────────────────────────────────────┘
-      ▲
-      │ SQL (versions, jobs, records, issues)
-┌─────┴───────┐
-│ PostgreSQL  │
-└─────────────┘
-```
-
-- Local VLM: FastAPI @ `http://vlm:8080` (MiniCPM-V or CPU fallback)
-- Egress guard: blocks outbound HTTP unless allowed
-
-***
-
-## Stack & Why
-
-- **FastAPI:** API + server-rendered review UI, typed, fast, great DX
-- **Celery + RabbitMQ:** async, reliable pipelines; parallel jobs
-- **PostgreSQL:** versioned records/jobs/exports; easy queries
-- **MinIO:** local S3 for raw emails, attachments, artifacts, final Excel
-- **Mailpit:** local SMTP inbox for demo/testing
-- **Local VLM Service:** hosts MiniCPM-V or CPU fallback (pdfplumber+OCR); no cloud calls
-- **Prometheus + OpenTelemetry:** metrics & traces  
-- **structlog:** Job-level JSON logs, PHI redaction
-
-***
-
-## Compliance Controls (Default: ON)
-
-- **Local-only:** all services in local Docker
-- **Egress guard:** blocks outbound HTTP to non-local hosts
-- **No proprietary LLMs:** Open-source VLM only, all local
-- **PHI-aware logs:** masks phones, NPIs; no raw PHI in logs
-
-***
-
-## Environment & Config
-
-See `.env.example` (copy to `.env`):
-```env
-# Core
-APP_ENV=local
-DATABASE_URL=postgresql+psycopg2://hilabs:hilabs@db:5432/hilabs
-S3_ENDPOINT=http://minio:9000
-S3_ACCESS_KEY=minio
-S3_SECRET_KEY=minio123
-S3_BUCKET=hilabs-artifacts
-
-# Queue
-CELERY_BROKER_URL=amqp://guest:guest@mq:5672//
-CELERY_RESULT_BACKEND=rpc://
-
-# Local VLM
-VLM_ENABLED=true
-VLM_URL=http://vlm:8080
-
-# Safety: block outbound HTTP beyond localhost
-ALLOW_EGRESS=false
-```
-
-***
-
-## Services (docker-compose.yml)
-
-| Service     | Purpose                | Port(s)          |
-|-------------|------------------------|------------------|
-| api         | FastAPI + UI           | 8000             |
-| worker      | Celery workers         |                  |
-| mq          | RabbitMQ (queue)       | 5672, mgmt 15672 |
-| db          | Postgres               | 5432             |
-| minio       | S3 object store        | 9000, console 9001|
-| mailpit     | SMTP test inbox        | Web 8025, SMTP 1025|
-| vlm         | Local VLM server       | 8080             |
-
-***
-
-## Data Model (Versioning & Rollback)
-
-- **emails:** metadata (`message_id`, `from`, `subject`), artifact URI
-- **jobs:** process state (`status`, `current_version_id`)
-- **versions:** append-only snapshots (author, reason)
-- **records:** roster rows for a version (1 row/provider)
-- **issues:** validator findings `{level, row, field, message}`
-- **exports:** immutable Excel artifacts (URI, checksum, version_id)
-- **audit_log:** audit who/when/what for edits/exports/rollbacks
-
-**Mechanics**
-- Extraction → Version 1 (system)
-- Manual edits → Version 2 (user)
-- Export binds to version_id
-- Rollback sets current_version_id; re-export as needed
-
-***
-
-## Multi-Agent Pipeline
-
-- **Order:** Intake → Classifier → Extractor (rule-first, VLM assist) → Normalize → Validate → Version → Review → Export  
-- **Extractors:**
-  - HTML: `pandas.read_html`, BeautifulSoup cleanup
-  - XLSX/CSV: Pandas direct
-  - PDF: pdfplumber / Camelot
-  - Text: line/col inference
-- **VLM assist:** For low-confidence/scanned docs, calls local VLM; falls back to rules if VLM unavailable
-- **Normalizer:** phones (E.164), dates (MM/DD/YYYY), addresses (usaddress/libpostal), NPI (Luhn)
-- **Validator:** required columns, duplicate NPIs, EffDate ≤ TermDate, DOB not future, confidence
-- **Version:** snapshot w/issues; status can be needs_review
-- **Human Review:** grid edit; issues panel; diff; rollback/version history
-- **Exporter:** strict Excel schema/order/types; provenance sheet; stored artifact
-
-***
-
-## Excel Template (strict order)
-
-1. Transaction Type  
-2. Transaction Attribute  
-3. Effective Date  
-4. Term Date  
-5. Term Reason  
-6. Provider Name  
-7. NPI  
-8. Specialty  
-9. State License  
-10. Organization Name  
-11. TIN  
-12. Group NPI  
-13. Address  
-14. Phone  
-15. Fax  
-16. PPG ID  
-17. Line of Business  
-
-**Exporter guarantees:**
-- Names/order match exactly
-- Proper date cells (not strings)
-- Text format for ZIP/NPI to preserve leading zeros
-- Hidden “Provenance” sheet (job_id, version_id, checksums, timings)
-
-***
-
-## Review UI (Minimal)
-- **Inbox:** job list (Pending, Processing, Needs Review, Ready, Exported)
-- **Job view:** two-pane: artifact preview + normalized table
-- **Issues**: filterable column
-- **Buttons:** Re-run, Approve, Export, Rollback
-- **Version history:** version list, diff counts, switch/rollback  
-- *(HTMX/Jinja; kept simple for hackathon speed)*
-
-***
-
-## API Endpoints (core)
-
-| Method | Endpoint                            | Description                               |
-|--------|-------------------------------------|-------------------------------------------|
-| POST   | /ingest                             | Upload raw .eml or JSON; returns job_id   |
-| GET    | /jobs, /jobs/{id}                   | Get job status, versions, issues, artifacts|
-| POST   | /jobs/{id}/process                  | Re-queue process (idempotent)             |
-| GET    | /jobs/{id}/versions                 | List versions                             |
-| POST   | /jobs/{id}/versions/{vid}/rollback  | Rollback current version                  |
-| POST   | /jobs/{id}/export                   | Generate Excel for current version        |
-| GET    | /exports/{id}/download              | Stream Excel from MinIO                   |
-
-***
-
-## Training & Adaptation (Local-Friendly, optional)
-
-- **Silver labeling**: auto-label synthetic PDFs/images generated from samples (perturb data, shuffle columns, etc.)
-- **PEFT/LoRA fine-tune:** adapters for schema-faithful output; single-GPU, small weights
-- **DPO**: align on strict JSON; build (good, slightly wrong) extraction pairs; bias model behavior
-- **Continuous learning:** Human edits feed into next round
-- **All code local**; zero uploads
-
-***
-
-## Observability
-
-- **Metrics** (`/metrics`)
-  - `api_requests_total{path,method,status}`
-  - `api_latency_seconds{path}`
-  - `agent_runs_total{agent}` / `agent_latency_seconds{agent}`
-  - `vlm_invocations_total`, `extract_fallback_total`
-  - Pipeline E2E, success/error rates
-- **Tracing:** OpenTelemetry per-agent & job-wide trace id.
-  - (optional: add Jaeger/Tempo UI)
-- **Logging:** `structlog`, job_id/version_id/trace_id, masks for NPIs/phones
-
-***
-
-## Security & Privacy
-
-- **Local-only**: egress guard blocks all non-local HTTP
-- **PHI minimization**: stores only required info; no raw PHI in logs
-- **Optional**: at-rest artifact encryption (envelope-AES GCM, blind indexes) via env flags (still all local)
-
-***
-
-## Run Script & Portability
-
-`run.sh`
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-# 1) seed env
-if [ ! -f .env ]; then cp .env.example .env; fi
-# 2) start everything
 docker compose up --build
 ```
-*Works on macOS / Linux / Windows (WSL2), only Docker required. Version-pinned for reproducibility.*
 
-***
+This brings up:
 
-## Testing & Demo Flow
+* `api` (FastAPI) at `http://localhost:8000`
+* `web` (Next.js) at `http://localhost:3000`
+* `rabbitmq`, `postgres`, `redis`, `minio`, `worker`
+* (optional) `mailpit` for local SMTP testing at `http://localhost:8025`
+* (optional) `grafana` at `http://localhost:3001` (Prometheus pre-wired)
 
-### How to Run Tests
+### First run
 
-#### Unit Tests
-```bash
-# Run all unit tests
-python tests/run_tests.py
+1. Open `http://localhost:3000`
+2. Click **Upload .eml** (or send an email to Mailpit and click **Open Inbox**)
+3. Click **Process to Excel** → watch the pipeline run
+4. Review flagged cells, **diff & rollback** if needed
+5. Click **Export** → download your Excel (exact template)
 
-# Run specific test modules
-python -m unittest tests.test_npi_validation
-python -m unittest tests.test_normalization
-python -m unittest tests.test_duplicate_detection
-python -m unittest tests.test_excel_export
-```
+> All artifacts (raw `.eml`, PDF pages, intermediate JSON, exports) are stored **locally** in MinIO.
 
-#### Smoke Test (End-to-End)
-```bash
-# Linux/macOS
-./scripts/smoke.sh
+---
 
-# Windows PowerShell
-.\scripts\smoke.ps1
-```
+## 🧪 Running models locally
 
-The smoke test will:
-1. Start Docker Compose services (if not running)
-2. Wait for API to be ready
-3. Create a sample EML file (if needed)
-4. Ingest the sample file
-5. Poll job status until completion
-6. Trigger Excel export
-7. Provide download URL
+* **VLM (MiniCPM-V):** start the local service (Docker image or Python script using OpenBMB repo).
+* **LayoutLMv3:** loaded via `transformers` from a local cache (weights included or mounted).
+* **SLM (our fine-tuned LoRA):** load base model + LoRA adapters from local path.
+* **Ollama / llama.cpp** (optional): host small text models locally for lightweight classification.
 
-### Manual Demo Flow
-1. Start stack: `./run.sh`
-2. In Mailpit UI, click "Send" (sample attachments also work via /ingest)
-3. Open Inbox UI → select job → click "Process to Excel"
-4. Review table, fix flagged cells → Approve
-5. Click Export, then Download (served from local MinIO)
-6. Show version history & rollback
-7. Visit `/metrics` for counters/latencies
+> The repo ships with **offline model cache instructions** (weights folder or HF cache mirror) and **env toggles** to disable/enable VLM usage per job.
 
-***
+---
 
-## Troubleshooting
+## Training (local) — **GRPO + LoRA** on SLM
 
-- **Nothing shows in jobs:**  
-  Check API logs (`docker compose logs api`) and worker logs (`worker`).  
-  Ensure RabbitMQ is up and `CELERY_BROKER_URL` matches.
+1. **Prepare silver data**
 
-- **MinIO auth errors:**  
-  Confirm `S3_ACCESS_KEY`/`SECRET_KEY`; create bucket in console if needed.
+   ```bash
+   python tools/gen_silver_data.py --inputs data/samples/ --out data/silver/
+   python tools/make_preferences.py --in data/silver/ --out data/prefs/
+   ```
+2. **Train LoRA adapters with GRPO**
 
-- **Slow PDFs:**  
-  Large scans on CPU are slow; limit pages, or prefer likely pages for VLM.
+   ```bash
+   python training/run_grpo.py \
+     --base_model ./models/slm-base \
+     --data_dir data/prefs \
+     --output_dir ./models/slm-grpo-lora \
+     --lora_r 16 --lora_alpha 32 --lora_dropout 0.1 \
+     --lr 1e-5 --batch 4 --grad_accum 8 --epochs 3
+   ```
+3. **Evaluate**
 
-- **Outbound call blocked:**  
-  By design. Set `ALLOW_EGRESS=true` only for dev (don’t submit with this on).
+   ```bash
+   python training/eval.py --model ./models/slm-grpo-lora --gold data/gold/
+   ```
+4. **Serve locally**
 
-***
+   ```bash
+   python services/slm_server.py --adapters ./models/slm-grpo-lora
+   ```
 
-## Repo Layout (suggested)
+*All scripts operate on local files; no internet required.*
+
+---
+
+## 🧷 Data model (versioning & audit)
+
+* `emails` – raw intake metadata + MinIO URI
+* `jobs` – lifecycle/status; current\_version\_id
+* `versions` – append-only snapshots (system/user edits)
+* `records` – rows per version (payload\_json + confidence + method)
+* `issues` – per-cell problems with severity + suggestions
+* `exports` – Excel artifacts with checksum + provenance
+* `audit_log` – who/what/when for every action
+
+> Rollback ≡ set `current_version_id` to any prior version; re-export is deterministic.
+
+---
+
+## Analytics & Observability
+
+* **Metrics:** throughput, latency per stage, extractor coverage, **VLM fallback rate**, validation error mix, edits per job, export counts.
+* **Traces:** one trace per job across agents; instant root-cause when something slows/fails.
+* **Dashboards:** pipeline SLOs, hot senders, error heatmaps, cost/time breakdowns.
+
+---
+
+## Edge cases we handle
+
+* Mixed/forwarded threads; quoted text and signatures
+* Multi-attachment emails (choose best candidate but keep alternates)
+* Corrupt/locked PDFs (graceful fail with actionables)
+* Ambiguous dates (explicit `MDY` unless sender profile overrides)
+* Addresses with low parser confidence (escalate + flag)
+* NPI typos (Luhn catch + fix suggestions)
+* Idempotency (message-id + content checksum)
+
+---
+
+## Privacy & Compliance (local-only)
+
+* All data stays on your machine (MinIO + Postgres disks).
+* TLS/at-rest encryption are supported (disabled by default for local demo).
+* Authentication/authorization hooks in the web app.
+* Full audit trail (view/edit/export).
+
+> Designed to align with HIPAA security safeguards when deployed in a secured environment.
+
+---
+
+## Project structure (overview)
 
 ```
 .
-├── api/
-│   ├── app/
-│   │   ├── main.py            # FastAPI routes + HTMX pages
-│   │   ├── config.py          # settings from env
-│   │   ├── db.py              # SQLAlchemy engine/session
-│   │   ├── models.py          # ORM tables (emails, jobs, versions, records, issues, exports)
-│   │   ├── schemas.py         # Pydantic DTOs
-│   │   ├── storage.py         # MinIO helpers (put/get objects)
-│   │   ├── celery_app.py      # Celery init
-│   │   ├── pipeline.py        # task orchestration
-│   │   ├── net_guard.py       # outbound HTTP guard
-│   │   └── agents/
-│   │       ├── intake_email.py
-│   │       ├── classifier.py
-│   │       ├── extract_rule.py
-│   │       ├── extract_pdf.py
-│   │       ├── vlm_client.py
-│   │       ├── normalizer.py
-│   │       ├── validator.py
-│   │       └── exporter_excel.py
-│   ├── Dockerfile
-│   └── requirements.txt
-├── vlm/
-│   ├── app.py                 # local VLM service (MiniCPM-V/cpu fallback)
-│   ├── Dockerfile
-│   └── requirements.txt
-├── samples/                   # Sample-1.eml, Sample-2.eml, Sample-3.eml
-├── docker-compose.yml
-├── .env.example
-├── run.sh
-├── README.md                  # (this doc)
-└── docs/ARCHITECTURE.md       # (deeper theory, diagrams - optional)
+├─ api/                # FastAPI app (ingest, jobs, versions, exports)
+├─ workers/            # Celery tasks (multi-agent pipeline)
+├─ models/             # Local base weights + LoRA adapters (no internet)
+├─ services/           # slm_server.py, vlm_server.py (local inference)
+├─ web/                # Next.js app (Inbox, Review, Analytics)
+├─ tools/              # silver data gen, augmentation, validators
+├─ training/           # GRPO trainer, reward functions, eval
+├─ docker-compose.yml  # local stack
+└─ README.md
 ```
 
-***
+---
 
-## Extensibility (Post-Hackathon)
+## How to run (quick)
 
-- Swap MinIO ↔️ S3 (just change env values)
-- Replace HTMX with Next.js SPA (API unchanged)
-- Scale: add more worker replicas
-- For new rules, deploy VLM & API on GPU, keep `/infer` contract
+```bash
+# 1) start the stack
+docker compose up --build
 
-***
+# 2) open UI
+open http://localhost:3000
 
-## Why it will score well
+# 3) upload a .eml and click "Process to Excel"
+```
 
-- One-click processing in inbox-like UI  
-- Multi-agent AI with open-source VLM (rule-first, efficient)  
-- Version history + rollback (with diff, cell-level)  
-- Robust validation (NPI/phone/date/address/duplicate)  
-- **Observability:** Production-grade metrics & tracing  
-- **Local-only, open source, reproducible—zero cloud dependencies**
+> GPU available? Set `VLM_GPU=1` and map `--gpus all` in compose for MiniCPM-V acceleration.
 
-***
+---
 
-## Appendix: Validation Rules (Summary)
+## Design decisions (and why)
 
-- Required columns present (exact schema)
-- Parseable phone (US default); E.164 normalization
-- Parseable dates; output as MM/DD/YYYY
-- NPI: 10-digit Luhn with 80840 prefix logic
-- Address: parse + confidence tracking
-- Detect duplicate NPIs
-- Effective Date ≤ Term Date, DOB not in future
-- "Information not found" for missing required cells at export
+* **Rules → then AI:** deterministic tools are fast and predictable; AI covers the weird 10–20% (PDF scans, broken tables).
+* **Agents, not a monolith:** clear boundaries, easier testing, targeted retries, and future parallelism.
+* **Version-everything:** healthcare ops need auditability and reversibility; versions make trust visible.
+* **Local-first:** meets hackathon constraints and real-world privacy expectations; can be cloudified later with the same APIs.
+* **GRPO over pure SFT:** schema compliance is about *preferences* (good vs almost-good); GRPO teaches the model what “good” *means*.
 
-***
+---
 
-## Appendix: Performance Tips (Local)
+## Roadmap / Future scope
 
-- Use CPU-first parsers; VLM only on flagged pages
-- For large PDFs: downsample/cap page count
-- Try quantized MiniCPM-V models for faster local inference
+* Provider masterdata joins (NPPES cache, specialty codes), offline-first
+* Active learning loop from operator edits → auto-label → re-train
+* Multi-tenant RBAC, approvals, and branch/merge versions
+* Streaming extraction for massive PDFs; multi-page parallelization
+* K8s deployment with autoscaling workers & GPU pools
+* Pluggable parsers (DocTR, Donut, Nougat) behind the same Agent API
 
-***
+---
+
+##  How to cite / inspiration (open source)
+
+* MiniCPM-V (OpenBMB), LayoutLMv3 (HF Transformers)
+* pdfplumber, Camelot, PyMuPDF, BeautifulSoup, pandas
+* phonenumbers, usaddress, libpostal, dateparser
+* Celery, RabbitMQ, FastAPI, Next.js, Tailwind, Prometheus, Grafana
+
+*(All run locally; we don’t call any proprietary APIs.)*
+
+---
+
+## Hackathon compliance checklist
+
+* [x] Public repo with **full code and run script(s)**
+* [x] **README** (this file), exact run instructions
+* [x] **No uploads** to third-party servers; **no proprietary LLM APIs**
+* [x] LLM/VLM run **locally** (weights stored locally / mounted)
+* [x] Reproducible with Docker Compose on any laptop
+
+---
+
+## Maintainers
+
+* Core engineering: Multi-agent design, data modeling, training, and UI/UX.
+* Contact: [Parth Badgurjar](https://github.com/Parth-Badgujar) [Agam Pandey](https://github.com/AGAMPANDEYY)

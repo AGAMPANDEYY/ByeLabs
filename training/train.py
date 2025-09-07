@@ -1,16 +1,26 @@
+import os
+import json 
 import random
+import argparse
 from tqdm.auto import tqdm
 from datasets import Dataset
 from unsloth import FastLanguageModel
 from trl import GRPOConfig, GRPOTrainer
-import json 
+
 from .reward_functions import * 
+
+parser = argparse.ArgumentParser()
+parser.add_argument("--base_model", type=str, default="Qwen/Qwen3-4B-Instruct-2507", help="Base model to use")
+parser.add_argument("--output_dir", type=str, default="./models/grpo_lora", help="Directory to save outputs")
+parser.add_argument("--data_dir", type=str, default="./training/dataset", help="Directory containing dataset files")
+args = parser.parse_args()
+base_model = args.base_model
 
 max_seq_length = 2048
 lora_rank = 32
 
 model, tokenizer = FastLanguageModel.from_pretrained(
-    model_name = "Qwen/Qwen3-4B-Instruct-2507",
+    model_name = args.base_model,
     max_seq_length = max_seq_length,
     load_in_4bit = False,
     fast_inference = True,
@@ -79,7 +89,7 @@ def get_input_from_email(email):
 
 dataset = []
 for i in range(3):
-    dataset += json.load(open(f"./dataset/dataset{i}.json"))
+    dataset += json.load(open(os.path.join(args.data_dir, f"dataset{i}.json")))
 
 for data in dataset:
     fields = data["extracted_fields"]
@@ -179,4 +189,4 @@ trainer = GRPOTrainer(
 trainer.train()
 
 
-model.save_lora("models/grpo_lora")
+model.save_lora(args.output_dir)

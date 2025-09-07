@@ -2,7 +2,7 @@
 
 > **Touchless end-to-end roster processing** — from raw emails (`.eml`, PDFs, images, HTML tables, CSV/XLSX) to a perfectly formatted Excel in one click.
 > **Everything runs 100% locally** (no proprietary APIs, no third-party uploads).
-> Built with a **multi-agent pipeline**, **open-source LLM/VLM**, versioning + rollback, analytics, and production-style observability.
+> Built with a **multi-agent pipeline**, **open-source LLM/VLM**, RL training with Group Reward Preference Optimisation policies on synthetic dataset, versioning + rollback, analytics, and production-style observability.
 
 ---
 
